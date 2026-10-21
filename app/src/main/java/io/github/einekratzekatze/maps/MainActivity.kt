@@ -48,11 +48,13 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.net.toUri
+import dagger.hilt.android.AndroidEntryPoint
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private var mapsWebView: WebView? = null
