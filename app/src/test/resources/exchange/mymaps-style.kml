@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+<Document>
+  <name>Loose map</name>
+  <Placemark>
+    <name>Loose point</name>
+    <address>Somewhere 1</address>
+    <description>top-level</description>
+    <MultiGeometry><Point><coordinates>10.5,20.25,0</coordinates></Point></MultiGeometry>
+  </Placemark>
+  <Folder>
+    <name>Outer</name>
+    <Folder>
+      <name>Inner</name>
+      <Placemark><name>Deep</name><Point><coordinates>-122.084,37.422,0</coordinates></Point></Placemark>
+    </Folder>
+    <Placemark><name>After inner</name><Point><coordinates>1,2,0</coordinates></Point></Placemark>
+  </Folder>
+</Document>
+</kml>

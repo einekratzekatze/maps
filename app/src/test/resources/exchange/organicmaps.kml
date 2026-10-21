@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>Mein Ausflug</name>
+  <visibility>1</visibility>
+  <Style id="placemark-red"><IconStyle><Icon><href>https://example.invalid/red.png</href></Icon></IconStyle></Style>
+  <Folder>
+    <name><![CDATA[Cafés & Bars]]></name>
+    <Placemark>
+      <name>Café Einstein</name>
+      <description><![CDATA[<b>Gut</b> & günstig]]></description>
+      <styleUrl>#placemark-red</styleUrl>
+      <Point><coordinates>13.3889,52.5200,0</coordinates></Point>
+      <ExtendedData xmlns:mwm="https://organicmaps.app">
+        <mwm:scale>12</mwm:scale>
+      </ExtendedData>
+    </Placemark>
+    <Placemark>
+      <name>Bar "Zwölf"</name>
+      <Point>
+        <coordinates>
+          -0.1278, 51.5074
+        </coordinates>
+      </Point>
+    </Placemark>
+  </Folder>
+  <Folder>
+    <name>Trails</name>
+    <Placemark>
+      <name>Bergweg</name>
+      <LineString><coordinates>8.0,47.0,400 8.1,47.1,450 8.2,47.2,500</coordinates></LineString>
+    </Placemark>
+    <Placemark>
+      <name>Park</name>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>1,1,0 2,2,0 1,2,0 1,1,0</coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>
+  </Folder>
+  <Folder><name>Leer</name></Folder>
+</Document>
+</kml>

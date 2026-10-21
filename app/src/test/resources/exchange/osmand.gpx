@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<gpx version="1.1" creator="OsmAnd~ 4.7.5" xmlns="http://www.topografix.com/GPX/1/1" xmlns:osmand="https://osmand.net" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>favorites</name>
+  </metadata>
+  <wpt lat="52.5163" lon="13.3777">
+    <time>2024-05-01T10:00:00Z</time>
+    <name>Brandenburger Tor</name>
+    <desc>Wahrzeichen &amp; Sehenswürdigkeit</desc>
+    <type>Berlin</type>
+    <extensions>
+      <osmand:address>Pariser Platz, 10117 Berlin</osmand:address>
+      <osmand:color>#ff0000</osmand:color>
+    </extensions>
+  </wpt>
+  <wpt lat="48.8584" lon="2.2945">
+    <name>Tour Eiffel</name>
+  </wpt>
+  <trk>
+    <name>Morning ride</name>
+    <type>Rides</type>
+    <trkseg>
+      <trkpt lat="52.5" lon="13.4"><ele>34.0</ele><time>2024-05-01T08:00:00Z</time></trkpt>
+      <trkpt lat="52.51" lon="13.41"><ele>35.0</ele></trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="52.52" lon="13.42"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Single point, ignored</name>
+    <trkseg><trkpt lat="1" lon="1"/></trkseg>
+  </trk>
+  <rte>
+    <name>Planned</name>
+    <rtept lat="50.0" lon="8.0"><name>Start</name></rtept>
+    <rtept lat="50.5" lon="8.5"/>
+  </rte>
+</gpx>
