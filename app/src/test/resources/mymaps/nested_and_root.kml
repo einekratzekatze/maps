@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+<Document>
+  <name>Nested</name>
+  <Placemark><name>Root A</name><Point><coordinates>10.0,50.0</coordinates></Point></Placemark>
+  <Folder>
+    <name>Outer</name>
+    <Folder>
+      <name>Inner</name>
+      <Placemark><name>Deep</name><Point><coordinates>11.0,51.0,5</coordinates></Point></Placemark>
+    </Folder>
+    <Folder>
+      <Placemark><name>Unnamed child</name><Point><coordinates>12.0,52.0</coordinates></Point></Placemark>
+    </Folder>
+  </Folder>
+  <Placemark><name>Root B</name>
+    <MultiGeometry><LineString><coordinates>1,1 2,2</coordinates></LineString><Point><coordinates>9.0,49.0</coordinates></Point></MultiGeometry>
+  </Placemark>
+</Document>
+</kml>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>Berlin Trip</name>
+  <description><![CDATA[Cafes &amp; sights]]></description>
+  <Style id="icon-1899-0288D1-normal">
+    <IconStyle>
+      <color>ffd18802</color>
+      <scale>1</scale>
+      <Icon><href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href></Icon>
+    </IconStyle>
+    <LabelStyle><scale>0</scale></LabelStyle>
+  </Style>
+  <Style id="icon-1899-0288D1-highlight">
+    <IconStyle><color>ffd18802</color><scale>1</scale></IconStyle>
+  </Style>
+  <StyleMap id="icon-1899-0288D1">
+    <Pair><key>normal</key><styleUrl>#icon-1899-0288D1-normal</styleUrl></Pair>
+    <Pair><key>highlight</key><styleUrl>#icon-1899-0288D1-highlight</styleUrl></Pair>
+  </StyleMap>
+  <Style id="line-000000-1200-nodesc-normal">
+    <LineStyle><color>ff000000</color><width>1.2</width></LineStyle>
+  </Style>
+  <Folder>
+    <name>Cafes</name>
+    <Placemark>
+      <name>Café Einstein</name>
+      <description><![CDATA[Kaffee &amp; Kuchen<br>Unter den Linden 42]]></description>
+      <styleUrl>#icon-1899-0288D1</styleUrl>
+      <ExtendedData>
+        <Data name="gx_media_links"><value>https://example.org/a.jpg</value></Data>
+      </ExtendedData>
+      <Point><coordinates>
+        13.3889,52.5163,0
+      </coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Bonanza &amp; Co</name>
+      <styleUrl>#icon-1899-0288D1</styleUrl>
+      <Point><coordinates>13.4115,52.5416,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name></name>
+      <Point><coordinates>13.5,52.6</coordinates></Point>
+    </Placemark>
+  </Folder>
+  <Folder>
+    <name>Routes</name>
+    <Placemark>
+      <name>Walk</name>
+      <styleUrl>#line-000000-1200-nodesc</styleUrl>
+      <LineString><tessellate>1</tessellate><coordinates>13.40,52.50,0 13.41,52.51,0</coordinates></LineString>
+    </Placemark>
+    <Placemark>
+      <name>Broken</name>
+      <Point><coordinates>abc,def</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <name>Park</name>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>13.4,52.5,0 13.5,52.5,0 13.5,52.6,0 13.4,52.5,0</coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>
+  </Folder>
+  <Folder>
+    <name>Empty layer</name>
+  </Folder>
+</Document>
+</kml>
