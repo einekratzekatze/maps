@@ -1,9 +1,11 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
-    compileSdk 35
-    namespace 'us.spotco.maps'
-    android.buildFeatures.buildConfig true
+    compileSdk = 36
+    namespace = 'io.github.einekratzekatze.maps'
+    android.buildFeatures.buildConfig = true
     dependenciesInfo {
         // Disable including dependency metadata when building APKs
         includeInApk = false
@@ -11,32 +13,30 @@ android {
         includeInBundle = false
     }
     defaultConfig {
-        applicationId "us.spotco.maps"
-        minSdkVersion 21
-        targetSdk 35
-        versionCode 48
-        versionName "4.8"
+        applicationId = "io.github.einekratzekatze.maps"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1.0"
     }
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
-            minifyEnabled true
-            zipAlignEnabled true
+            minifyEnabled false
         }
         release {
             shrinkResources true
             minifyEnabled true
-            zipAlignEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    lintOptions {
+    lint {
         abortOnError false
         disable 'MissingTranslation'
     }
 }
 
 dependencies {
-    implementation 'androidx.webkit:webkit:1.5.0'
-    implementation 'com.github.woheller69:FreeDroidWarn:V1.6'
+    implementation 'androidx.webkit:webkit:1.15.0'
+    implementation 'androidx.activity:activity-ktx:1.13.0'
 }

@@ -3,6 +3,7 @@
     <string name="intent_string">Open in restricted webview</string>
     <string name="title_location_permission">Location permission</string>
     <string name="text_location_permission">Please grant location permission and press button again.</string>
+    <string name="button_no_thanks">No thanks</string>
     <string name="error_no_gps">Please activate GPS</string>
     <string name="no_app_installed">No app installed</string>
     <string name="title_open_link">Open link</string>
