@@ -50,6 +50,17 @@ class MapUrlParserTest {
         assertEquals(MapUrlState.Unknown, MapUrlParser.parse(null))
     }
 
+    @Test fun tiltedMetersKeepsTilt() {
+        check("https://www.google.com/maps/@52.5,13.4,3000m,45t", MapMode.Map,
+            MapCamera(LatLon(52.5, 13.4), 3000.0, CameraMode.Satellite3dMeters, tilted = true))
+        check("https://www.google.com/maps/@52.5,13.4,3000m", MapMode.Map,
+            MapCamera(LatLon(52.5, 13.4), 3000.0, CameraMode.Satellite3dMeters, tilted = false))
+    }
+
+    @Test fun backslashHostSpoofIsRejected() {
+        check("https://evil.com\\@www.google.com/maps/@1,2,3z", MapMode.NonMap, null)
+    }
+
     @Test fun tilted() {
         check("https://www.google.com/maps/@52.5,13.4,15z,45t", MapMode.Map, c(52.5, 13.4, 15.0, CameraMode.Tilted))
         check("https://www.google.com/maps/@52.5,13.4,15z,0h,60t", MapMode.Map, c(52.5, 13.4, 15.0, CameraMode.Tilted))

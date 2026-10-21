@@ -4,6 +4,8 @@ import androidx.compose.ui.unit.IntSize
 import io.github.einekratzekatze.maps.domain.CameraMode
 import io.github.einekratzekatze.maps.domain.GeoBounds
 import io.github.einekratzekatze.maps.domain.MapCamera
+import io.github.einekratzekatze.maps.domain.normalizeLon
+import kotlin.math.hypot
 import kotlin.math.PI
 import kotlin.math.atan
 import kotlin.math.cos
@@ -12,11 +14,21 @@ import kotlin.math.pow
 import kotlin.math.sinh
 import kotlin.math.tan
 
-/** Pure camera + viewport -> bounds (floating-places-bubble.md §5.3). */
+/**
+ * Pure camera + viewport -> bounds (floating-places-bubble.md §5.3).
+ *
+ * Tilted/rotated cameras (mode [CameraMode.Tilted] or [MapCamera.tilted]) are not north-up and the
+ * heading is not known here, so the bounds are the square whose side is the viewport diagonal
+ * times [TILT_EXPAND]. That square contains the visible ground for any heading, which means
+ * places outside the visible area may be included (over-inclusion is accepted; missing a visible
+ * place is not). Near the horizon at very high tilt the visible ground can still exceed this.
+ */
 object WebMercator {
     const val TILE = 256.0
     const val MAX_LAT = 85.05112878
     const val TILT_EXPAND = 1.5
+    // TODO(B2b): calibrate on a device; B0 (d) has not yet shown whether `1234m` is the vertical
+    // span, the diagonal or the camera altitude.
     const val METERS_CONSTANT = 156543.034
 
     /**
@@ -48,9 +60,10 @@ object WebMercator {
         }
         if (!zoom.isFinite()) return null
 
-        val scale = if (camera.mode == CameraMode.Tilted) TILT_EXPAND else 1.0
-        val w = viewportCssPx.width * scale
-        val h = viewportCssPx.height * scale
+        val rotated = camera.mode == CameraMode.Tilted || camera.tilted
+        val side = hypot(viewportCssPx.width.toDouble(), viewportCssPx.height.toDouble()) * TILT_EXPAND
+        val w = if (rotated) side else viewportCssPx.width.toDouble()
+        val h = if (rotated) side else viewportCssPx.height.toDouble()
         val worldSize = TILE * 2.0.pow(zoom.coerceIn(0.0, 30.0))
 
         val cy = latToY(clampedLat, worldSize)
@@ -77,10 +90,7 @@ object WebMercator {
     }
 
     /** Into [-180, 180). */
-    private fun normalizeWest(lon: Double): Double {
-        val m = ((lon + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
-        return m
-    }
+    private fun normalizeWest(lon: Double): Double = normalizeLon(lon)
 
     /** Into (-180, 180], so a box ending exactly on the antimeridian does not look wrapped. */
     private fun normalizeEast(lon: Double): Double {

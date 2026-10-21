@@ -246,3 +246,42 @@ input.
   rotation-safe square expansion and accept over-inclusion?
 - **D6 (SF-2):** wait for B0 (d) real `a`-suffix URLs before settling the Street View rule. Until then, should the
   parser treat non-`3a` values as tilted satellite?
+
+## 9. Resolution
+
+Status: fixed = code and regression test; documented = KDoc/comment only; deferred = not done.
+Owner decisions applied as defaults: D1 `forcekml=1`, D2 keep skipping shapes, D3 cap 25 waypoints, D4 accept losses, D5 rotation-safe square, D6 leave `a` rule.
+
+| Finding | Status | Note |
+|---|---|---|
+| BL-1 | fixed | `KmlParser` requires a `<kml>` root, throws on empty/HTML/zip input. |
+| BL-2 | fixed | `kmlUrl` appends `&forcekml=1` (D1); unzipping KMZ not implemented, a zip fails with a clear `KmlParseException`. TODO 5.1 not updated (docs untouched). |
+| SF-1 | fixed | Tilted/rotated: square of side `hypot(w,h) * 1.5`; may include extra places (documented). Very high tilt near the horizon is still not guaranteed. |
+| SF-2 | documented | `a` rule unchanged, `TODO(B0 spike)` comment in `MapUrlParser`. |
+| SF-3 | fixed | `MapCamera.tilted` (default false) set for `…m` with tilt/heading; `WebMercator` expands it. |
+| SF-4 | fixed | DOCTYPE rejected before the root in `KmlParser`, `KmlReader`, `GpxReader`. |
+| SF-5 | fixed | `KmlParser` uses `readAllText` for leaf elements. |
+| SF-6 | fixed | KDoc corrected (bounded by largest text node, which the XML parser buffers); non-Point `<coordinates>` skipped without a string; text capped; streaming test uses a generating `InputStream`. |
+| SF-7 | fixed | Foreign tracks keep origin, destination and at most `MAX_FOREIGN_WAYPOINTS` = 25 sampled waypoints (D3); `ExchangeDocument.simplifiedDrives` counts them. Own files (`kind=drive` / `maps:hasOrigin`) are unlimited. |
+| SF-8 | fixed / documented | Order, `""` list names and same-named lists fixed via `<maps:list index>`; label whitespace/empty handling unified (trim, empty = null) in both formats; other losses documented in `GpxWriter`/`KmlWriter` KDoc (D4). Empty lists still vanish in GPX. |
+| SF-9 | fixed | `GpxWriter` iterates `lists` once (keeps the headers), items once. |
+| SF-10 | fixed | GPX writes `-180` for lon 180 (also after rounding); documented. |
+| SF-11 | fixed | `KmlReader` now names nested folders "Outer / Inner" and drops container-only folders, like `KmlParser`. The two readers are still separate (SIM-1 deferred). |
+| SF-12 | fixed | `styleUrl` resolved by fragment; id-less `<Style>` in a Placemark or StyleMap Pair is used. |
+| N-1 | documented | schema.md says `ParsedKml`, code says `ParsedMyMap`; rename one of them when schema.md is next edited. |
+| N-2, N-3, N-4 | deferred | Doc/spec edits (docs/ untouched). |
+| N-5, N-6 | fixed | Backslash in the authority rejected; explicit Google ccTLD list rejects `google.com.ev`. `maps.google.com/maps/d` not accepted (no evidence it is pasted). |
+| N-7 | fixed / documented | `GeoBounds.contains` treats ±180 as one meridian; polar caveat documented. |
+| N-8 | documented | `IOException` propagation noted in reader KDoc; not wrapped. |
+| N-9, N-10 | fixed | One strict decimal parser, regexes hoisted. |
+| N-11 | deferred | `MapUrls.coord` vs `formatCoord` left separate. |
+| N-12 | fixed | `SublistBuilder` constructor default. |
+| D2 | documented | `skippedNonPoint`/`skippedInvalid` kept; KDoc says the UI must show them. |
+| D5 | fixed | See SF-1. |
+| D6 | see SF-2, SF-3 | |
+| SIM-1 | deferred | Merging the two KML readers; behaviour is now aligned instead. |
+| SIM-2, SIM-3 | fixed | `LatLon.ofOrNull`, `normalizeLon`, `parseKmlTuple`/`kmlTuples` are shared. |
+| SIM-4 | deferred | Exception types unchanged. |
+| T-1, T-4, T-5 | fixed | Tests added/fixed for every fix above; `satelliteMeters…` circularity remains until B2b calibration. |
+| T-2, T-3 | deferred | No offline copy of gpx.xsd/ogckml22.xsd; no real exports available. |
+| METERS_CONSTANT | documented | `TODO(B2b)` comment added. |

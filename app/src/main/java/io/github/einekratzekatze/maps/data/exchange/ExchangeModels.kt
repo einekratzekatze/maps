@@ -9,7 +9,8 @@ import io.github.einekratzekatze.maps.domain.LatLon
  *
  * [ExchangeList.places] and [ExchangeList.drives] are [Iterable]s (not [List]s) so an exporter can
  * pass a lazily-loaded, cursor-backed sequence; writers iterate each of them exactly once per
- * list and never hold more than one element.
+ * list and never hold more than one element. The `lists` collection itself is also iterated once
+ * (writers keep only the cheap [ExchangeList] headers while writing).
  */
 data class ExchangeList(
     val name: String,
@@ -42,7 +43,11 @@ data class ExchangeDrive(
     val travelMode: String? = null,
 )
 
-/** Result of reading a file. [name] is the document / metadata name when present. */
-data class ExchangeDocument(val name: String?, val lists: List<ExchangeList>)
+/**
+ * Result of reading a file. [name] is the document / metadata name when present.
+ * [simplifiedDrives] counts foreign tracks/routes that had more than [MAX_FOREIGN_WAYPOINTS]
+ * intermediate points and were reduced to evenly sampled ones; the UI should tell the user.
+ */
+data class ExchangeDocument(val name: String?, val lists: List<ExchangeList>, val simplifiedDrives: Int = 0)
 
 class ExchangeFormatException(message: String, cause: Throwable? = null) : Exception(message, cause)

@@ -20,6 +20,8 @@ object MapUrlParser {
     fun parse(url: String?): MapUrlState {
         if (url == null) return MapUrlState.Unknown
         val m = URL_REGEX.find(url.trim()) ?: return MapUrlState.Unknown
+        // WHATWG treats '\' as a path separator, so `evil.com\@www.google.com` has host evil.com.
+        if ('\\' in m.groupValues[2]) return MapUrlState.Unknown
         val host = m.groupValues[2].substringAfterLast('@').substringBefore(':').lowercase()
         val path = m.groupValues[3]
         if (host !in HOSTS) return MapUrlState.Unknown
@@ -47,15 +49,20 @@ object MapUrlParser {
         val lat = m.groupValues[1].toDoubleOrNull() ?: return null
         val lon = m.groupValues[2].toDoubleOrNull() ?: return null
         val value = m.groupValues[3].toDoubleOrNull() ?: return null
-        if (lat !in -90.0..90.0 || lon !in -180.0..180.0 || !value.isFinite()) return null
+        val center = LatLon.ofOrNull(lat, lon) ?: return null
+        if (!value.isFinite()) return null
         val unit = m.groupValues[4]
         val extras = SUFFIX_REGEX.findAll(m.groupValues[5]).associate { it.groupValues[2] to it.groupValues[1].toDouble() }
+        val tilted = (extras["t"] ?: 0.0) > 0.0 || (extras["h"] ?: 0.0) != 0.0
         val mode = when (unit) {
+            // TODO(B0 spike): `...a` is also the altitude (metres) of desktop 3D/tilted satellite
+            // views (`@40.689,-74.044,346a,35y,315.97h,72.88t`), which this classifies as Street
+            // View. Settle the rule once B0 (d) has real URLs; see REVIEW-batch1 SF-2.
             "a" -> CameraMode.StreetView
             "m" -> if (value > 0.0) CameraMode.Satellite3dMeters else return null
-            else -> if ((extras["t"] ?: 0.0) > 0.0 || (extras["h"] ?: 0.0) != 0.0) CameraMode.Tilted else CameraMode.Map
+            else -> if (tilted) CameraMode.Tilted else CameraMode.Map
         }
-        return MapCamera(LatLon(lat, lon), value, mode)
+        return MapCamera(center, value, mode, tilted = tilted && unit == "m")
     }
 
     private fun firstSegment(path: String, prefix: String): String? {

@@ -8,17 +8,33 @@ import org.xmlpull.v1.XmlPullParser
 /**
  * Reads KML 2.2 as written by [KmlWriter], OsmAnd, Organic Maps and Google My Maps style files.
  *
- * - Every `<Folder>` becomes a list (nested folders become separate lists, innermost name).
+ * - Every `<Folder>` becomes a list. Nested folders are named by their path ("Outer / Inner") and
+ *   a folder that only contains other folders produces no list; an empty leaf folder is kept.
+ *   This is the same rule as the My Maps parser (`KmlParser`).
  * - Placemarks directly under `<Document>`/`<kml>` form an extra list named after the document
  *   (or "" if unnamed), added only if it has content.
- * - `<Point>` -> place; `<LineString>` -> drive. Polygons, `gx:Track` etc. are skipped.
+ * - `<Point>` -> place; `<LineString>` -> drive. Polygons, `gx:Track` etc. are skipped. A
+ *   LineString from a foreign file (no `kind=drive` ExtendedData) keeps its origin, destination
+ *   and at most [MAX_FOREIGN_WAYPOINTS] evenly sampled waypoints; see
+ *   [ExchangeDocument.simplifiedDrives].
  * - `<description>` -> notes, `<address>` -> address. HTML in descriptions is kept verbatim.
+ * - Text is trimmed everywhere (names, notes, address, ExtendedData values); an empty or blank
+ *   label is the same as no label (null).
+ * - A DOCTYPE is rejected ([ExchangeFormatException]) to stop entity-expansion bombs.
+ *
+ * @throws ExchangeFormatException for malformed XML or a non-KML root. A mid-stream
+ *   [java.io.IOException] from the input is not wrapped and propagates as is.
  */
 object KmlReader {
     fun read(input: InputStream): ExchangeDocument = withParser(input, null, ::parse)
     fun read(reader: Reader): ExchangeDocument = withParser(null, reader, ::parse)
 
-    private class Builder(var name: String?, val keepIfEmpty: Boolean) {
+    private class Builder(val parentName: String?, val keepIfEmpty: Boolean) {
+        var name: String? = parentName
+        var hasChildFolder = false
+        fun setOwnName(own: String?) {
+            name = listOfNotNull(parentName, own).joinToString(" / ").ifEmpty { null }
+        }
         val places = ArrayList<ExchangePlace>()
         val drives = ArrayList<ExchangeDrive>()
         fun toList() = ExchangeList(name.orEmpty(), places, drives)
@@ -30,14 +46,14 @@ object KmlReader {
         val stack = ArrayList<Builder>() // containers: Document / Folder
         var docName: String? = null
         val root = Builder(null, keepIfEmpty = false)
+        var simplified = 0
         builders.add(root)
         stack.add(root)
         var sawKml = false
         val elems = ArrayList<String>()
 
-        while (true) {
-            val ev = p.next()
-            if (ev == XmlPullParser.END_DOCUMENT) break
+        var ev = p.eventType
+        while (ev != XmlPullParser.END_DOCUMENT) {
             if (ev == XmlPullParser.START_TAG) {
                 val n = p.localName()
                 val parent = elems.lastOrNull()
@@ -45,13 +61,15 @@ object KmlReader {
                     n == "name" && (parent == "Document" || parent == "Folder") -> {
                         val t = p.readAllText().trimmedOrNull()
                         val top = stack.last()
-                        if (top === root) { if (docName == null) docName = t } else top.name = t
+                        if (top === root) { if (docName == null) docName = t } else top.setOwnName(t)
                     }
-                    n == "Placemark" -> readPlacemark(p, stack.last())
+                    n == "Placemark" -> readPlacemark(p, stack.last()) { simplified++ }
                     else -> {
-                        if (n == "kml") sawKml = true
+                        if (n == "kml" && elems.isEmpty()) sawKml = true
                         if (n == "Folder") {
-                            val b = Builder(null, keepIfEmpty = true)
+                            val outer = stack.last()
+                            outer.hasChildFolder = true
+                            val b = Builder(outer.name.takeIf { outer !== root }, keepIfEmpty = true)
                             builders.add(b); stack.add(b)
                         }
                         elems.add(n)
@@ -61,15 +79,17 @@ object KmlReader {
                 val n = elems.removeLastOrNull()
                 if (n == "Folder" && stack.size > 1) stack.removeAt(stack.size - 1)
             }
+            ev = p.next()
         }
         if (elems.isNotEmpty()) throw ExchangeFormatException("Unexpected end of document")
         if (!sawKml) throw ExchangeFormatException("Not a KML document (no <kml> element)")
         root.name = docName
-        val lists = builders.filter { it.keepIfEmpty || !it.isEmpty }.map { it.toList() }
-        return ExchangeDocument(docName, lists)
+        val lists = builders.filter { if (it.keepIfEmpty) !(it.isEmpty && it.hasChildFolder) else !it.isEmpty }
+            .map { it.toList() }
+        return ExchangeDocument(docName, lists, simplified)
     }
 
-    private fun readPlacemark(p: XmlPullParser, target: Builder) {
+    private fun readPlacemark(p: XmlPullParser, target: Builder, onSimplified: () -> Unit) {
         var name = ""
         var description: String? = null
         var address: String? = null
@@ -111,7 +131,8 @@ object KmlReader {
                             }
                         }
                         if (key != null && value != null) {
-                            if (key == KmlNames.WAYPOINT_LABEL) waypointLabels.add(value.ifEmpty { null }) else data[key] = value
+                            val v = value.trim()
+                            if (key == KmlNames.WAYPOINT_LABEL) waypointLabels.add(v.ifEmpty { null }) else data[key] = v
                         }
                     }
                     else -> stack.add(n)
@@ -133,20 +154,17 @@ object KmlReader {
                         hasOrigin && i == 0 -> data[KmlNames.ORIGIN_LABEL]
                         i == last -> data[KmlNames.DEST_LABEL]
                         else -> waypointLabels.getOrNull(i - first)
-                    }
+                    }?.ifEmpty { null }
                     ll to label
                 }
-                buildDrive(name, labelled, hasOrigin, data[KmlNames.TRAVEL_MODE])?.let { target.drives.add(it) }
+                val own = data[KmlNames.KIND] == KmlNames.KIND_DRIVE
+                val cap = if (own) Int.MAX_VALUE else MAX_FOREIGN_WAYPOINTS
+                buildDrive(name, labelled, hasOrigin, data[KmlNames.TRAVEL_MODE], cap, onSimplified)?.let { target.drives.add(it) }
             }
             pt != null -> target.places.add(ExchangePlace(name, pt, address, description))
         }
     }
 
     /** `lon,lat[,alt]` tuples separated by whitespace; invalid tuples are skipped. */
-    internal fun parseCoordinates(s: String): List<LatLon> =
-        s.replace(Regex("\\s*,\\s*"), ",").trim().split(Regex("\\s+")).mapNotNull { tuple ->
-            if (tuple.isEmpty()) return@mapNotNull null
-            val parts = tuple.split(',')
-            if (parts.size < 2) null else parseLatLon(parts[1], parts[0])
-        }
+    internal fun parseCoordinates(s: String): List<LatLon> = kmlTuples(s).mapNotNull(::parseKmlTuple)
 }

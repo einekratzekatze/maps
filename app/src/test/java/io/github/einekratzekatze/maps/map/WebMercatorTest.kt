@@ -94,12 +94,36 @@ class WebMercatorTest {
         assertTrue(s.north < -60.0 && s.north > s.south)
     }
 
-    @Test fun tiltedIsExpandedOneAndAHalf() {
+    @Test fun tiltedIsTheExpandedCircumscribedSquare() {
         val vp = IntSize(360, 640)
         val flat = WebMercator.bounds(cam(10.0, 10.0, 12.0), vp)
         val tilted = WebMercator.bounds(cam(10.0, 10.0, 12.0, CameraMode.Tilted), vp)
-        assertEquals(1.5 * (flat.east - flat.west), tilted.east - tilted.west, 1e-9)
+        val side = Math.hypot(360.0, 640.0) * WebMercator.TILT_EXPAND
+        val widthDeg = side / (256.0 * Math.pow(2.0, 12.0)) * 360.0
+        assertEquals(widthDeg, tilted.east - tilted.west, 1e-9)
         assertTrue(tilted.north > flat.north && tilted.south < flat.south)
+        assertTrue(tilted.west < flat.west && tilted.east > flat.east)
+    }
+
+    /** SF-1: heading 90 degrees on a portrait viewport shows the long side east-west. */
+    @Test fun rotatedPortraitViewportIsCovered() {
+        val vp = IntSize(400, 800)
+        // Visible ground at heading 90: half of the 800 px side points east/west.
+        val neededHalfWidthDeg = 400.0 / (256.0 * Math.pow(2.0, 10.0)) * 360.0
+        for (c in listOf(cam(0.0, 0.0, 10.0, CameraMode.Tilted), MapCamera(LatLon(0.0, 0.0), 10.0, CameraMode.Tilted, tilted = true))) {
+            val b = WebMercator.bounds(c, vp)
+            assertTrue("west ${b.west}", b.west <= -neededHalfWidthDeg)
+            assertTrue("east ${b.east}", b.east >= neededHalfWidthDeg)
+            assertTrue(b.contains(LatLon(0.0, neededHalfWidthDeg)))
+        }
+    }
+
+    @Test fun tiltedMetersCameraIsExpanded() {
+        val vp = IntSize(360, 640)
+        val meters = WebMercator.METERS_CONSTANT * 640 / Math.pow(2.0, 15.0)
+        val flat = WebMercator.bounds(cam(0.0, 0.0, meters, CameraMode.Satellite3dMeters), vp)
+        val tilted = WebMercator.bounds(MapCamera(LatLon(0.0, 0.0), meters, CameraMode.Satellite3dMeters, tilted = true), vp)
+        assertTrue(tilted.west < flat.west && tilted.east > flat.east && tilted.north > flat.north)
     }
 
     @Test fun satelliteMetersConvertsViaViewportHeight() {

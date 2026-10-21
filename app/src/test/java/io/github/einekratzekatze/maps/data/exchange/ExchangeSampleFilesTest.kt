@@ -16,7 +16,7 @@ class ExchangeSampleFilesTest {
         val doc = GpxReader.read(res("osmand.gpx")).let { it.copy(lists = it.lists.materialized()) }
         assertEquals("favorites", doc.name)
         // Berlin (typed), Rides (typed), and untyped items under the metadata name
-        assertEquals(listOf("favorites", "Berlin", "Rides"), doc.lists.map { it.name }.sortedBy { listOf("favorites", "Berlin", "Rides").indexOf(it) })
+        assertEquals(listOf("Berlin", "favorites", "Rides"), doc.lists.map { it.name }) // first-seen order
         val berlin = doc.lists.first { it.name == "Berlin" }.places.single()
         assertEquals(ExchangePlace("Brandenburger Tor", LatLon(52.5163, 13.3777), "Pariser Platz, 10117 Berlin", "Wahrzeichen & Sehenswürdigkeit"), berlin)
         val untyped = doc.lists.first { it.name == "favorites" }
@@ -51,7 +51,7 @@ class ExchangeSampleFilesTest {
     @Test fun looseAndNestedKml() {
         val doc = KmlReader.read(res("mymaps-style.kml")).let { it.copy(lists = it.lists.materialized()) }
         assertEquals("Loose map", doc.name)
-        assertEquals(listOf("Loose map", "Outer", "Inner"), doc.lists.map { it.name })
+        assertEquals(listOf("Loose map", "Outer", "Outer / Inner"), doc.lists.map { it.name })
         assertEquals(ExchangePlace("Loose point", LatLon(20.25, 10.5), "Somewhere 1", "top-level"), doc.lists[0].places.single())
         assertEquals(listOf("After inner"), doc.lists[1].places.map { it.name })
         assertEquals(listOf("Deep"), doc.lists[2].places.map { it.name })

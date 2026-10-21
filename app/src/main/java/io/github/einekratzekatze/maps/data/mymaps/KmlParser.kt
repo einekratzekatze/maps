@@ -1,6 +1,12 @@
 package io.github.einekratzekatze.maps.data.mymaps
 
 import android.util.Xml
+import io.github.einekratzekatze.maps.data.exchange.advanceToRoot
+import io.github.einekratzekatze.maps.data.exchange.kmlTuples
+import io.github.einekratzekatze.maps.data.exchange.localName
+import io.github.einekratzekatze.maps.data.exchange.parseKmlTuple
+import io.github.einekratzekatze.maps.data.exchange.readAllText
+import io.github.einekratzekatze.maps.data.exchange.skipElement
 import io.github.einekratzekatze.maps.domain.LatLon
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
@@ -28,14 +34,22 @@ import java.io.StringReader
  * - Colour: `<Style><IconStyle><color>` (else Poly/LineStyle), reached via the placemark's
  *   `styleUrl` directly or through a `<StyleMap>` "normal" pair. Resolved after the whole file
  *   is read, so style order does not matter.
- * - Malformed XML throws [KmlParseException] (no partial result). Description text is capped
- *   at [MAX_DESCRIPTION] chars; memory use is proportional to the output, not the XML input.
+ * - Malformed XML, an empty document, a document whose root is not `<kml>` (an HTML error page, a
+ *   KMZ/zip archive) and any DOCTYPE throw [KmlParseException] (no partial result, so a caller
+ *   must never replace a cached list with an empty one). Child markup inside a leaf element such
+ *   as an unescaped `<description>a <b>b</b></description>` is flattened to its text.
+ * - Memory: the XML pull parser buffers one text node at a time, so peak memory is bounded by the
+ *   largest single text node plus the output; it does not grow with the number of placemarks.
+ *   Kept text is capped at [TEXT_CAP] chars (description at [MAX_DESCRIPTION] after trimming), and
+ *   `<coordinates>` of anything but a Point (line/polygon vertices) are skipped without being read
+ *   into a string. A single multi-gigabyte text node is not defended against beyond that.
+ * - The skipped counts in [ParsedMyMap] must be surfaced by the UI ("N shapes not imported").
  */
 object KmlParser {
     const val MAX_DESCRIPTION = 20_000
+    private const val TEXT_CAP = MAX_DESCRIPTION * 2
     private const val MAX_EXTENDED = 50
 
-    private val NUMBER = Regex("""[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?""")
     private val COLOR = Regex("""[0-9a-fA-F]{8}""")
     private val OTHER_GEOMETRY = setOf("LineString", "Polygon", "LinearRing", "Track", "gx:Track", "MultiTrack", "gx:MultiTrack")
 
@@ -47,6 +61,7 @@ object KmlParser {
         try {
             val p = Xml.newPullParser()
             p.init(source)
+            p.advanceToRoot() // rejects DOCTYPE before any entity can be expanded
             return Run(p).run()
         } catch (e: XmlPullParserException) {
             throw KmlParseException("Malformed KML: ${e.message}", e)
@@ -56,7 +71,7 @@ object KmlParser {
     }
 
     private class SublistBuilder(val parentName: String?) {
-        var name: String? = null
+        var name: String? = parentName
         var isImplicit = false
         var hasChildFolder = false
         val places = ArrayList<ParsedPlacemark>()
@@ -64,7 +79,6 @@ object KmlParser {
             val own = raw.trim().ifEmpty { null }
             name = listOfNotNull(parentName, own).joinToString(" / ").ifEmpty { null }
         }
-        init { name = parentName }
     }
 
     private class PlacemarkBuilder {
@@ -74,6 +88,7 @@ object KmlParser {
         var badCoordinates = false
         var otherGeometry = false
         var styleUrl: String? = null
+        var inlineStyle: StyleInfo? = null
         val extended = LinkedHashMap<String, String>()
     }
 
@@ -88,12 +103,14 @@ object KmlParser {
         var pm: PlacemarkBuilder? = null
         val styles = HashMap<String, StyleInfo>()
         val styleMaps = HashMap<String, String>()
+        val styleMapInline = HashMap<String, StyleInfo>()
         var curStyle: StyleInfo? = null
         var curStyleMapId: String? = null
         var pairKey: String? = null
         var dataName: String? = null
         var skippedNonPoint = 0
         var skippedInvalid = 0
+        var sawKml = false
 
         fun parent(): String? = path.lastOrNull()
         fun inPath(n: String) = path.contains(n)
@@ -102,11 +119,18 @@ object KmlParser {
             var ev = p.eventType
             while (ev != XmlPullParser.END_DOCUMENT) {
                 when (ev) {
-                    XmlPullParser.START_TAG -> start(p.name)
-                    XmlPullParser.END_TAG -> end(p.name)
+                    XmlPullParser.START_TAG -> {
+                        if (path.isEmpty() && !sawKml) {
+                            if (p.localName() != "kml") throw KmlParseException("Not a KML document (root is <${p.name}>)")
+                            sawKml = true
+                        }
+                        start(p.localName())
+                    }
+                    XmlPullParser.END_TAG -> end(p.localName())
                 }
                 ev = p.next()
             }
+            if (!sawKml) throw KmlParseException("Not a KML document (empty, or a KMZ/zip archive)")
             return finish()
         }
 
@@ -114,8 +138,11 @@ object KmlParser {
             when (tag) {
                 "name", "description", "coordinates", "styleUrl", "color", "key", "value" -> {
                     val parent = parent()
-                    val text = p.nextText() // consumes the end tag; leaf elements are not pushed
-                    leaf(tag, parent, text)
+                    if (tag == "coordinates" && parent != "Point") {
+                        p.skipElement() // line/polygon vertices are never read into a string
+                    } else {
+                        leaf(tag, parent, p.readAllText(TEXT_CAP)) // consumes the end tag
+                    }
                     return
                 }
                 "Folder" -> {
@@ -124,7 +151,17 @@ object KmlParser {
                     folders.add(b); builders.add(b)
                 }
                 "Placemark" -> if (pm == null) pm = PlacemarkBuilder()
-                "Style" -> { curStyle = StyleInfo().also { s -> p.getAttributeValue(null, "id")?.let { styles[it] = s } } }
+                "Style" -> {
+                    curStyle = StyleInfo().also { s ->
+                        val id = p.getAttributeValue(null, "id")
+                        val mapId = curStyleMapId
+                        when {
+                            id != null -> styles[id] = s
+                            pm != null -> pm!!.inlineStyle = s // inline <Style> of a Placemark
+                            mapId != null && pairKey == "normal" -> styleMapInline[mapId] = s
+                        }
+                    }
+                }
                 "StyleMap" -> curStyleMapId = p.getAttributeValue(null, "id")
                 "Pair" -> pairKey = null
                 "Data" -> dataName = p.getAttributeValue(null, "name")
@@ -161,7 +198,7 @@ object KmlParser {
                 }
                 "styleUrl" -> when {
                     parent == "Placemark" && pm != null -> pm.styleUrl = text.trim().ifEmpty { null }
-                    parent == "Pair" && pairKey == "normal" -> curStyleMapId?.let { styleMaps[it] = text.trim().removePrefix("#") }
+                    parent == "Pair" && pairKey == "normal" -> curStyleMapId?.let { styleMaps[it] = text.trim().substringAfterLast('#') }
                 }
                 "key" -> if (parent == "Pair") pairKey = text.trim()
                 "color" -> curStyle?.let { s ->
@@ -185,11 +222,14 @@ object KmlParser {
             val target = folders.lastOrNull() ?: implicit ?: SublistBuilder(null).also {
                 it.isImplicit = true; implicit = it; builders.add(it)
             }
-            target.places.add(ParsedPlacemark(b.name, b.description, pos, b.styleUrl, null, b.extended))
+            val inline = b.inlineStyle?.let { it.icon ?: it.other }
+            target.places.add(ParsedPlacemark(b.name, b.description, pos, b.styleUrl, inline, b.extended))
         }
 
         fun colorFor(styleUrl: String?): Int? {
-            var id = styleUrl?.trim()?.removePrefix("#") ?: return null
+            // `styles.kml#s` and `#s` both resolve by fragment (external files are not fetched).
+            var id = styleUrl?.trim()?.substringAfterLast('#') ?: return null
+            styleMapInline[id]?.let { return it.icon ?: it.other }
             styleMaps[id]?.let { id = it }
             val s = styles[id] ?: return null
             return s.icon ?: s.other
@@ -199,24 +239,14 @@ object KmlParser {
             val subs = builders
                 .filter { !(it.places.isEmpty() && it.hasChildFolder) }
                 .map { b ->
-                    ParsedSublist(b.name, b.isImplicit, b.places.map { it.copy(colorArgb = colorFor(it.styleUrl)) })
+                    ParsedSublist(b.name, b.isImplicit, b.places.map { it.copy(colorArgb = it.colorArgb ?: colorFor(it.styleUrl)) })
                 }
             return ParsedMyMap(mapName, subs, skippedNonPoint, skippedInvalid)
         }
     }
 
     /** "lon,lat[,alt]" -> LatLon, or null. Only the first whitespace-separated tuple is read. */
-    internal fun parseCoordinates(text: String): LatLon? {
-        val tuple = text.trim().replace(Regex("\\s*,\\s*"), ",").split(Regex("\\s+")).firstOrNull() ?: return null
-        val parts = tuple.split(',')
-        if (parts.size < 2) return null
-        if (!NUMBER.matches(parts[0].trim()) || !NUMBER.matches(parts[1].trim())) return null
-        // String.toDouble() is locale-independent ('.' decimal separator).
-        val lon = parts[0].trim().toDouble()
-        val lat = parts[1].trim().toDouble()
-        if (!lon.isFinite() || !lat.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
-        return LatLon(lat, lon)
-    }
+    internal fun parseCoordinates(text: String): LatLon? = kmlTuples(text).firstOrNull()?.let(::parseKmlTuple)
 
     /** KML aabbggrr -> 0xAARRGGBB, or null. */
     internal fun parseColor(text: String): Int? {

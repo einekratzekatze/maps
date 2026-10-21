@@ -118,18 +118,107 @@ class KmlParserTest {
     @Test(expected = KmlParseException::class)
     fun notXmlThrows() { KmlParser.parse("hello") }
 
-    @Test fun hugeFileStreams() {
-        val n = 50_000
-        val sb = StringBuilder("<kml><Document><name>Big</name><Folder><name>F</name>")
-        for (i in 0 until n) {
-            sb.append("<Placemark><name>P").append(i).append("</name><Point><coordinates>")
-                .append(10 + (i % 100) / 100.0).append(',').append(50 + (i % 50) / 50.0)
-                .append(",0</coordinates></Point></Placemark>")
+    /** Generates [count] placemarks on demand; the whole document never exists in memory. */
+    private class GeneratedKml(private val count: Int) : java.io.InputStream() {
+        private var next = 0
+        private var buf = "<kml><Document><name>Big</name><Folder><name>F</name>".toByteArray()
+        private var pos = 0
+        private var footerDone = false
+        var maxBuffered = 0L
+        var produced = 0L
+
+        override fun read(): Int {
+            while (pos >= buf.size) {
+                buf = when {
+                    next < count -> {
+                        val i = next++
+                        ("<Placemark><name>P$i</name><Point><coordinates>" + (10 + (i % 100) / 100.0) + "," +
+                            (50 + (i % 50) / 50.0) + ",0</coordinates></Point></Placemark>").toByteArray()
+                    }
+                    !footerDone -> { footerDone = true; "</Folder></Document></kml>".toByteArray() }
+                    else -> return -1
+                }
+                pos = 0
+            }
+            produced++
+            return buf[pos++].toInt() and 0xFF
         }
-        sb.append("</Folder></Document></kml>")
-        val map = KmlParser.parse(sb.toString().byteInputStream())
+    }
+
+    @Test fun hugeInputIsReadFromAGeneratingStream() {
+        val n = 100_000
+        val input = GeneratedKml(n)
+        val map = KmlParser.parse(input)
         assertEquals(n, map.placemarkCount)
-        assertEquals("P49999", map.sublists[0].placemarks.last().name)
+        assertEquals("P${n - 1}", map.sublists[0].placemarks.last().name)
+        assertTrue("produced ${input.produced} bytes", input.produced > 8_000_000)
+    }
+
+    @Test fun lineStringVerticesAreNotKept() {
+        val vertices = (0 until 50_000).joinToString(" ") { "10.$it,50.$it,0" }
+        val map = KmlParser.parse("<kml><Document><Placemark><LineString><coordinates>$vertices</coordinates></LineString></Placemark></Document></kml>")
+        assertEquals(1, map.skippedNonPoint)
+        assertTrue(map.sublists.isEmpty())
+    }
+
+    // BL-1: input that is not KML must fail instead of yielding an empty map (which would wipe a cache).
+    @Test(expected = KmlParseException::class)
+    fun emptyInputThrows() { KmlParser.parse("") }
+
+    @Test(expected = KmlParseException::class)
+    fun emptyStreamThrows() { KmlParser.parse(java.io.ByteArrayInputStream(ByteArray(0))) }
+
+    @Test(expected = KmlParseException::class)
+    fun htmlPageThrows() { KmlParser.parse("<html><body>Sign in</body></html>") }
+
+    @Test(expected = KmlParseException::class)
+    fun wellFormedNonKmlRootThrows() { KmlParser.parse("<html/>") }
+
+    @Test(expected = KmlParseException::class)
+    fun kmzZipThrows() {
+        KmlParser.parse(java.io.ByteArrayInputStream(byteArrayOf(0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x08, 0x00, 0, 0, 0, 0)))
+    }
+
+    @Test fun commentsAndDeclarationBeforeRootAreFine() {
+        val map = KmlParser.parse("<?xml version=\"1.0\"?><!-- c --><kml><Document><name>x</name></Document></kml>")
+        assertEquals("x", map.name)
+    }
+
+    // SF-4: entity bomb.
+    @Test fun doctypeIsRejected() {
+        val bomb = "<?xml version=\"1.0\"?><!DOCTYPE kml [<!ENTITY a \"aaaaaaaaaa\"><!ENTITY b \"&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;\">" +
+            "<!ENTITY c \"&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;\">]><kml><Document><name>&c;</name></Document></kml>"
+        try {
+            KmlParser.parse(bomb)
+            org.junit.Assert.fail("DOCTYPE must be rejected")
+        } catch (e: KmlParseException) {
+            assertTrue(e.message!!, e.message!!.contains("DOCTYPE"))
+        }
+    }
+
+    // SF-5: HTML inside a leaf element must not abort the import.
+    @Test fun childMarkupInDescriptionIsFlattened() {
+        val map = KmlParser.parse("<kml><Document><Placemark><name>n</name><description>a <b>b</b> c</description><Point><coordinates>1,2</coordinates></Point></Placemark></Document></kml>")
+        assertEquals("a b c", map.sublists.single().placemarks.single().description)
+    }
+
+    // SF-12
+    @Test fun styleUrlWithFilePrefixAndInlineStyles() {
+        val kml = """<kml><Document>
+            <Style id="s"><IconStyle><color>ff0000ff</color></IconStyle></Style>
+            <StyleMap id="m"><Pair><key>normal</key><Style><IconStyle><color>ff00ff00</color></IconStyle></Style></Pair></StyleMap>
+            <Placemark><name>a</name><styleUrl>styles.kml#s</styleUrl><Point><coordinates>1,2</coordinates></Point></Placemark>
+            <Placemark><name>b</name><Style><IconStyle><color>ffff0000</color></IconStyle></Style><Point><coordinates>1,2</coordinates></Point></Placemark>
+            <Placemark><name>c</name><styleUrl>#m</styleUrl><Point><coordinates>1,2</coordinates></Point></Placemark>
+            </Document></kml>"""
+        val pms = KmlParser.parse(kml).sublists.single().placemarks
+        assertEquals(0xFFFF0000.toInt(), pms[0].colorArgb) // aabbggrr ff0000ff = red
+        assertEquals(0xFF0000FF.toInt(), pms[1].colorArgb) // inline ffff0000 = blue
+        assertEquals(0xFF00FF00.toInt(), pms[2].colorArgb) // inline Style in StyleMap Pair
+    }
+
+    @Test fun sharedCoordinateValidatorRejectsSuffixes() {
+        assertNull(KmlParser.parseCoordinates("1.5f,2d"))
     }
 
     @Test fun longDescriptionIsCapped() {

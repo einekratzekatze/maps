@@ -33,6 +33,24 @@ class GeoModelsTest {
         assertFalse(b.contains(LatLon(0.0, 360.0)))
     }
 
+    @Test fun lon180And180AreTheSameMeridian() {
+        val b = GeoBounds(-10.0, -180.0, 10.0, -170.0)
+        assertTrue(b.contains(LatLon(0.0, 180.0)))
+        assertTrue(GeoBounds(-10.0, 170.0, 10.0, 180.0).contains(LatLon(0.0, -180.0)))
+        assertFalse(b.contains(LatLon(0.0, 0.0)))
+    }
+
+    @Test fun sharedValidatorAndNormalisation() {
+        assertEquals(LatLon(1.0, 2.0), LatLon.ofOrNull(1.0, 2.0))
+        assertEquals(null, LatLon.ofOrNull(91.0, 0.0))
+        assertEquals(null, LatLon.ofOrNull(0.0, 180.5))
+        assertEquals(null, LatLon.ofOrNull(Double.NaN, 0.0))
+        assertEquals(null, LatLon.ofOrNull(null, 0.0))
+        assertEquals(-180.0, normalizeLon(180.0), 0.0)
+        assertEquals(-175.0, normalizeLon(185.0), 0.0)
+        assertEquals(10.0, normalizeLon(-350.0), 1e-9)
+    }
+
     @Test fun nanIsNeverContained() {
         assertFalse(GeoBounds(-90.0, -180.0, 90.0, 180.0).contains(LatLon(Double.NaN, 0.0)))
     }

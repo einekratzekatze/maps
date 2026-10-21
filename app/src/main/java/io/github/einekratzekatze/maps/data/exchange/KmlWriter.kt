@@ -7,7 +7,13 @@ import java.io.OutputStream
  * KML 2.2 export. One `<Folder>` per list; each place is a `<Placemark>` with a `<Point>`
  * (`lon,lat,0`), each drive a `<Placemark>` with a `<LineString>` of origin (if set), waypoints,
  * destination. Drive details KML cannot express (unset origin, labels, travel mode) go into
- * `<ExtendedData>` so our own files round-trip losslessly; other apps ignore it.
+ * `<ExtendedData>` so our own files round-trip; other apps ignore it.
+ *
+ * Accepted round-trip limitations (owner decision D4): [KmlReader] trims leading/trailing
+ * whitespace of names, notes, addresses and labels and maps empty labels to null; CR/CRLF read back
+ * as LF; characters invalid in XML 1.0 are dropped on write; coordinates keep at most 7 decimals;
+ * a list name containing " / " is read back unchanged, but nested folders from other files
+ * are joined with it. Lists and their places/drives are each iterated once.
  */
 object KmlWriter {
     const val NAMESPACE = "http://www.opengis.net/kml/2.2"

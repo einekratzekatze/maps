@@ -36,8 +36,15 @@ class MyMapsUrlTest {
         assertNull(MyMapsUrl.extractMapId("https://www.google.com/maps/d/viewer?xmid=$id"))
     }
 
+    @Test fun googleHostVariantsAreExplicit() {
+        assertEquals(id, MyMapsUrl.extractMapId("https://www.google.co.uk/maps/d/viewer?mid=$id"))
+        assertEquals(id, MyMapsUrl.extractMapId("https://www.google.com.au/maps/d/viewer?mid=$id"))
+        assertNull(MyMapsUrl.extractMapId("https://www.google.com.ev/maps/d/viewer?mid=$id"))
+        assertNull(MyMapsUrl.extractMapId("https://www.google.co.xx/maps/d/viewer?mid=$id"))
+    }
+
     @Test fun kmlUrl() {
-        assertEquals("https://www.google.com/maps/d/kml?mid=$id", MyMapsUrl.kmlUrl(id))
+        assertEquals("https://www.google.com/maps/d/kml?mid=$id&forcekml=1", MyMapsUrl.kmlUrl(id))
     }
 
     @Test(expected = IllegalArgumentException::class)
