@@ -60,9 +60,13 @@ Not captured: the first Directions press (place to dir), transit/bike Start pres
 
 **Fix direction for N1/N2:** classify at step (1) (https, host `maps.app.goo.gl`, `hasGesture=true`) using `current`; for Start, block the navigation and hand off the destination (never load `link`); for Directions, keep loading `link`. Until the launcher exists, the minimal bug fix is: when `current` is a complete `/maps/dir/<o>/<d>` URL, ignore the `maps.app.goo.gl` navigation instead of loading `link`.
 
-## Geolocation ("from my location" hangs)
+## Geolocation ("from my location" hangs): diagnosed, device setting
 
-`navigator.geolocation.getCurrentPosition` in the page timed out after 20 s (code 3) both with and without high accuracy; the location permission is granted and the permission state in the page is `prompt` (the app answers `onGeolocationPermissionsShowPrompt` itself). The device's last GPS fix was 7 days old, so the cause may be simply no fix at the test location; not diagnosed. Open: does the native Maps app get a location at the same spot? If yes, this is a WebView geolocation bug to investigate (the app only keeps the GPS provider warm in `onResume`).
+`navigator.geolocation.getCurrentPosition` in the page times out after 10-20 s (code 3), with and without high accuracy. Cause, from `dumpsys location`:
+- The WebView only sees the platform location providers. On this GrapheneOS phone the **network provider (`app.grapheneos.networklocation`) is installed but disabled** (`enabled=false`, `allowed=false`, no last location), and the **GPS has had no fix for 7 days**. The app has received 0 locations in 14 minutes.
+- The native Google Maps app still gets a location because it uses Play Services' own fused provider; refreshing there does not feed the OS providers, so it does not help the WebView.
+- Fix on the device: enable the OS network location (GrapheneOS Settings > Location > Network location), or get a GPS fix outdoors. Not an app bug.
+- Product follow-ups: a visible state when "Your location" has no fix instead of an endless spinner, and a hint pointing to the system setting.
 
 ## Other observations (affect the bubble and compose-host specs)
 
