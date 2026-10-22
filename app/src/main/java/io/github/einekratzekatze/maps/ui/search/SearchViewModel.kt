@@ -57,7 +57,7 @@ class SearchViewModel @Inject constructor(
     private val places: PlacesQueries,
     private val recents: RecentSearches,
     private val autocomplete: AutocompleteClient,
-) : ViewModel() {
+) : ViewModel(), SearchActions {
 
     companion object {
         const val LOCAL_DEBOUNCE_MS = 100L
@@ -134,7 +134,7 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch { mapState.urlState.collect { if (it.mode !in FIELD_MODES) stopEditing() } }
     }
 
-    fun onFocusChanged(focused: Boolean) {
+    override fun onFocusChanged(focused: Boolean) {
         if (focused == editing.value) return
         if (focused) {
             if (mapState.urlState.value.mode !in FIELD_MODES) return
@@ -146,11 +146,11 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun onQueryChange(q: String) {
+    override fun onQueryChange(q: String) {
         if (editing.value) typed.value = q
     }
 
-    fun onSubmit() = submit(typed.value)
+    override fun onSubmit() = submit(typed.value)
 
     fun onSuggestion(s: Suggestion) {
         when (s) {
@@ -171,8 +171,13 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch { recents.delete(id) }
     }
 
-    fun onMenuClick() {
+    override fun onMenuClick() {
         commands.send(MapCommand.OpenGmapsMenu)
+    }
+
+    /** Leaves the directions page the way GMaps' own back would (WebView history). */
+    override fun onDirectionsBack() {
+        commands.send(MapCommand.EvaluateJs("history.back()"))
     }
 
     /** MapBackHandler priority 1 (compose-host.md §7.4). */

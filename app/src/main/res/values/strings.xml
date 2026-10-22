@@ -65,4 +65,15 @@
         <item quantity="other">%d metres</item>
     </plurals>
     <string name="distance_km_spoken">%s kilometres</string>
+    <!-- Custom search field (docs/design/custom-search-field.md) -->
+    <string name="search_hint">Search here</string>
+    <string name="search_menu">Menu</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_directions">Directions</string>
+    <string name="search_back_to_map">Back to map</string>
+    <string name="search_section_saved">Saved places</string>
+    <string name="search_section_recent">Recent</string>
+    <string name="search_section_google">Google</string>
+    <string name="search_google_unavailable">Google suggestions unavailable</string>
+    <string name="search_delete_recent">Remove %s from recent searches</string>
 </resources>
