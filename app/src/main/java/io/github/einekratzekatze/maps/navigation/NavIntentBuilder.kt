@@ -17,6 +17,16 @@ object NavIntentBuilder {
 
     fun build(target: NavTarget): Intent = Intent(Intent.ACTION_VIEW, Uri.parse(geoUri(target)))
 
+    /** Google Maps "Maps URLs" route with an explicit origin; `geo:` cannot carry one. */
+    fun routeUrl(origin: String, target: NavTarget): String =
+        "https://www.google.com/maps/dir/?api=1&origin=" + encode(origin) + "&destination=" + encode(destination(target))
+
+    fun buildRoute(origin: String, target: NavTarget, packageName: String): Intent =
+        Intent(Intent.ACTION_VIEW, Uri.parse(routeUrl(origin, target))).setPackage(packageName)
+
+    private fun destination(target: NavTarget): String =
+        target.latLon?.let { "${number(it.lat)},${number(it.lon)}" } ?: requireNotNull(target.label)
+
     /** Locale-independent, at most 7 decimals, no exponent, no "-0". */
     private fun number(value: Double): String {
         val decimal = BigDecimal.valueOf(value).setScale(7, RoundingMode.HALF_UP)

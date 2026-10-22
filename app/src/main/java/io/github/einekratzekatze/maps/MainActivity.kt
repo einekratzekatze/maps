@@ -52,6 +52,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.net.toUri
 import io.github.einekratzekatze.maps.navigation.NavLauncher
 import io.github.einekratzekatze.maps.navigation.StartDeduper
+import io.github.einekratzekatze.maps.navigation.StartOrigin
 import io.github.einekratzekatze.maps.navigation.StartPress
 import io.github.einekratzekatze.maps.navigation.StartTargetParser
 import dagger.hilt.android.AndroidEntryPoint
@@ -254,7 +255,7 @@ class MainActivity : ComponentActivity() {
                     val handoff = StartTargetParser.parse(url)
                     if (handoff != null && startDeduper.shouldLaunch(handoff.target)) {
                         // TODO.md 2.2: preferred app setting, pending-drive prompt, OsmAnd deep links (later tasks)
-                        NavLauncher.launch(this@MainActivity, handoff.target, ComponentName(this@MainActivity, MainActivity::class.java))
+                        NavLauncher.launch(this@MainActivity, handoff.target, ComponentName(this@MainActivity, MainActivity::class.java), StartOrigin.parse(view.url))
                     }
                     Log.d(TAG, "[shouldOverrideUrlLoading][START] Handled (parsed=${handoff != null}), keeping the route page")
                     return true
