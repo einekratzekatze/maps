@@ -10,9 +10,9 @@ import io.github.einekratzekatze.maps.R
 /** Starts a chooser for [NavIntentBuilder.build], excluding this app. Needs the `geo:` `<queries>` entry. */
 object NavLauncher {
     /** @return true when a chooser was started. */
-    fun launch(context: Context, target: NavTarget, self: ComponentName, origin: String? = null): Boolean {
+    fun launch(context: Context, target: NavTarget, self: ComponentName, origin: String? = null, mode: TravelMode? = null): Boolean {
         val intent = NavIntentBuilder.build(target)
-        val routeIntent = origin?.let { NavIntentBuilder.buildRoute(it, target, GOOGLE_MAPS) }
+        val routeIntent = origin?.let { NavIntentBuilder.buildRoute(it, target, mode, GOOGLE_MAPS) }
             ?.takeIf { context.packageManager.resolveActivity(it, 0) != null }
         val handlers = context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
             .filter { it.activityInfo.packageName != context.packageName }

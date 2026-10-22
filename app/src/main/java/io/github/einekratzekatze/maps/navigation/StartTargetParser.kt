@@ -9,8 +9,8 @@ import kotlin.math.abs
  * Travel mode from `!3e<N>` in the GMaps `data` blob. The 0/1/2/3 = drive/bike/walk/transit
  * convention is UNVERIFIED (spike N0 only saw 0, 2 and 3). Not acted on yet.
  */
-enum class TravelMode {
-    Drive, Bike, Walk, Transit;
+enum class TravelMode(val apiName: String) {
+    Drive("driving"), Bike("bicycling"), Walk("walking"), Transit("transit");
 
     companion object {
         fun fromCode(code: Int): TravelMode? = entries.getOrNull(code)

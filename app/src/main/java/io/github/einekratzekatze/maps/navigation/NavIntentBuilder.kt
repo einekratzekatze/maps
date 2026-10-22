@@ -18,11 +18,12 @@ object NavIntentBuilder {
     fun build(target: NavTarget): Intent = Intent(Intent.ACTION_VIEW, Uri.parse(geoUri(target)))
 
     /** Google Maps "Maps URLs" route with an explicit origin; `geo:` cannot carry one. */
-    fun routeUrl(origin: String, target: NavTarget): String =
-        "https://www.google.com/maps/dir/?api=1&origin=" + encode(origin) + "&destination=" + encode(destination(target))
+    fun routeUrl(origin: String, target: NavTarget, mode: TravelMode? = null): String =
+        "https://www.google.com/maps/dir/?api=1&origin=" + encode(origin) + "&destination=" + encode(destination(target)) +
+            mode?.let { "&travelmode=" + it.apiName }.orEmpty()
 
-    fun buildRoute(origin: String, target: NavTarget, packageName: String): Intent =
-        Intent(Intent.ACTION_VIEW, Uri.parse(routeUrl(origin, target))).setPackage(packageName)
+    fun buildRoute(origin: String, target: NavTarget, mode: TravelMode?, packageName: String): Intent =
+        Intent(Intent.ACTION_VIEW, Uri.parse(routeUrl(origin, target, mode))).setPackage(packageName)
 
     private fun destination(target: NavTarget): String =
         target.latLon?.let { "${number(it.lat)},${number(it.lon)}" } ?: requireNotNull(target.label)

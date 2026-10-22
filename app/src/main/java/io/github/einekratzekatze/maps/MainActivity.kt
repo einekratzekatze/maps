@@ -255,7 +255,7 @@ class MainActivity : ComponentActivity() {
                     val handoff = StartTargetParser.parse(url)
                     if (handoff != null && startDeduper.shouldLaunch(handoff.target)) {
                         // TODO.md 2.2: preferred app setting, pending-drive prompt, OsmAnd deep links (later tasks)
-                        NavLauncher.launch(this@MainActivity, handoff.target, ComponentName(this@MainActivity, MainActivity::class.java), StartOrigin.parse(view.url))
+                        NavLauncher.launch(this@MainActivity, handoff.target, ComponentName(this@MainActivity, MainActivity::class.java), StartOrigin.parse(view.url), handoff.mode)
                     }
                     Log.d(TAG, "[shouldOverrideUrlLoading][START] Handled (parsed=${handoff != null}), keeping the route page")
                     return true

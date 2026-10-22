@@ -37,4 +37,14 @@ class StartOriginTest {
             NavIntentBuilder.routeUrl("A", NavTarget(null, "Alexanderplatz")),
         )
     }
+
+    @Test fun routeUrlCarriesTravelMode() {
+        val target = NavTarget(null, "Alexanderplatz")
+        assertEquals(
+            "https://www.google.com/maps/dir/?api=1&origin=A&destination=Alexanderplatz&travelmode=walking",
+            NavIntentBuilder.routeUrl("A", target, TravelMode.Walk),
+        )
+        assertEquals("transit", TravelMode.fromCode(3)?.apiName)
+        assertEquals("bicycling", TravelMode.fromCode(1)?.apiName)
+    }
 }
