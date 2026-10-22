@@ -39,6 +39,9 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.webkit.JavaScriptReplyProxy
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebSettingsCompat
@@ -54,6 +57,7 @@ import io.github.einekratzekatze.maps.navigation.StartPress
 import io.github.einekratzekatze.maps.navigation.StartTargetParser
 import org.json.JSONException
 import org.json.JSONObject
+import kotlinx.coroutines.launch
 
 /**
  * The single owner of the WebView (compose-host.md §3). Activity-scoped: created in `onCreate`,
@@ -70,6 +74,7 @@ class WebViewHost(
     private val settings: WebSettings = webView.settings
     private val startDeduper = StartDeduper(now = SystemClock::elapsedRealtime)
     private var locationRequestCount = 0
+    private val urlTracker = MapUrlTracker({ webView.url }, mapState::reportUrl)
     /** Reply channel of the main frame's GmwBridge, set by its first message (§4.3). */
     private var bridgeReply: JavaScriptReplyProxy? = null
 
@@ -168,6 +173,9 @@ class WebViewHost(
             mapState.reportViewportSize(v.width, v.height, v.resources.displayMetrics.density)
         }
         installPageScripts()
+        activity.lifecycleScope.launch {
+            activity.repeatOnLifecycle(Lifecycle.State.RESUMED) { urlTracker.pollWhileResumed() }
+        }
     }
 
     override fun loadUrl(url: String) = webView.loadUrl(url)
@@ -322,7 +330,7 @@ class WebViewHost(
         override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
             super.doUpdateVisitedHistory(view, url, isReload)
             if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "history reload=$isReload url=$url")
-            mapState.reportUrl(url)
+            urlTracker.onVisitedHistory(url)
         }
 
         override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
@@ -330,7 +338,7 @@ class WebViewHost(
             if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "pageStarted url=$url")
             // A full load is starting: the old camera is stale (floating-places-bubble.md §5.1).
             bridgeReply = null
-            mapState.reportUrl(null)
+            urlTracker.onPageStarted()
             evaluatePageScripts()
         }
 
@@ -397,7 +405,7 @@ class WebViewHost(
         override fun onPageFinished(view: WebView, url: String) {
             super.onPageFinished(view, url)
             if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "pageFinished url=$url")
-            mapState.reportUrl(url)
+            urlTracker.onPageFinished(url)
             view.evaluateJavascript("""
                 var head = document.getElementsByTagName('head');
                 if (head.length > 0) {
