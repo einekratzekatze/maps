@@ -25,6 +25,10 @@ import io.github.einekratzekatze.maps.data.repo.PlacesQueries
 import io.github.einekratzekatze.maps.data.repo.PlacesRepository
 import io.github.einekratzekatze.maps.data.prefs.BubblePrefs
 import io.github.einekratzekatze.maps.data.prefs.DataStoreBubblePrefs
+import io.github.einekratzekatze.maps.data.prefs.DataStoreSearchPrefs
+import io.github.einekratzekatze.maps.data.prefs.SearchPrefs
+import io.github.einekratzekatze.maps.search.AutocompleteClient
+import io.github.einekratzekatze.maps.search.PlacesAutocompleteClient
 import javax.inject.Singleton
 
 /** Repositories have @Inject constructors and need no bindings here. */
@@ -38,6 +42,8 @@ object DatabaseModule {
     @Provides @Singleton fun drivesListIdStore(impl: DataStoreDrivesListIdStore): DrivesListIdStore = impl
     @Provides fun placesQueries(impl: PlacesRepository): PlacesQueries = impl
     @Provides fun bubblePrefs(impl: DataStoreBubblePrefs): BubblePrefs = impl
+    @Provides fun searchPrefs(impl: DataStoreSearchPrefs): SearchPrefs = impl
+    @Provides fun autocompleteClient(impl: PlacesAutocompleteClient): AutocompleteClient = impl
 
     /** The single app-wide preferences DataStore (one file; features add keys, never a second delegate). */
     @Provides @Singleton
