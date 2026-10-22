@@ -194,13 +194,13 @@ Discriminator is the outer `utm_campaign` query param:
 enums stored by name). Do not take entity fields from this file or from the feature specs.
 
 **Verification:** `[unit-testable]` (Robolectric, in-memory Room)
-- [ ] DB1: entities `PlaceList`, `Place` (+ `externalSublistId`, `nameNormalized`,
+- [x] DB1: entities `PlaceList`, `Place` (+ `externalSublistId`, `nameNormalized`,
   `addressNormalized`, `(lat, lon)` index), `ImportantLocation` (Home/Work seeded with
   nullable coordinates), `Drive` (nullable origin coords, waypoint JSON, travel mode),
   `ExternalList`, `ExternalSublist`, `RecentSearch`; converters; `TextNormalizer`; `WaypointJson`
-- [ ] DB2: `PlaceDao` (incl. ordered, capped `observeInBounds`, `search`) + `ImportantLocationDao` + `PlacesRepository`
-- [ ] DB3: `PlaceListDao`, `DriveDao` + repositories
-- [ ] DB4: `RecentSearchDao` + repository (see 8.3)
+- [x] DB2: `PlaceDao` (incl. ordered, capped `observeInBounds`, `search`) + `ImportantLocationDao` + `PlacesRepository`
+- [x] DB3: `PlaceListDao`, `DriveDao` + repositories
+- [x] DB4: `RecentSearchDao` + repository (see 8.3)
 - [ ] DB5: `ExternalListDao.replaceContent` (with Phase 5.1)
 
 ### 3.2 Viewport-based filtering
