@@ -13,4 +13,50 @@
     <string name="text_warning_link">WARNING: This link is not secure!</string>
     <string name="dialog_StarOnGitHub">Do you like this app? Please give a star on GitHub or buy the developer a coffee via PayPal.</string>
     <string name="dialog_Later_button">Maybe later</string>
+    <!-- Floating places bubble (docs/design/floating-places-bubble.md) -->
+    <string name="bubble_description">Saved places</string>
+    <string name="bubble_open">Show nearby saved places</string>
+    <plurals name="bubble_state_in_view">
+        <item quantity="one">%d in view</item>
+        <item quantity="other">%d in view</item>
+    </plurals>
+    <string name="bubble_state_many_in_view">more than 99 in view</string>
+    <string name="bubble_state_none">none in view</string>
+    <string name="bubble_state_unknown">map position unknown</string>
+    <string name="bubble_move_left">Move to left edge</string>
+    <string name="bubble_move_right">Move to right edge</string>
+    <string name="bubble_move_up">Move up</string>
+    <string name="bubble_move_down">Move down</string>
+    <string name="nearby_title">Nearby</string>
+    <string name="nearby_pane">Nearby saved places</string>
+    <string name="close">Close</string>
+    <plurals name="nearby_subtitle">
+        <item quantity="one">%d saved place in view</item>
+        <item quantity="other">%d saved places in view</item>
+    </plurals>
+    <string name="nearby_subtitle_many">500+ saved places in view</string>
+    <string name="nearby_loading">Loading…</string>
+    <string name="nearby_unknown">Move the map to see saved places here.</string>
+    <string name="nearby_no_places">No saved places yet. Places you save will appear here.</string>
+    <string name="nearby_none_in_view">No saved places in this area. Zoom out to see more.</string>
+    <string name="nearby_footer">Showing %1$d nearest of %2$d · zoom in to narrow</string>
+    <string name="nearby_footer_truncated">Showing %1$d nearest · 500+ in view · zoom in to narrow</string>
+    <string name="place_list_more">%1$s +%2$d</string>
+    <string name="place_secondary">%1$s · %2$s</string>
+    <string name="navigate_to">Navigate to %s</string>
+    <string name="navigate">Navigate</string>
+    <string name="show_on_map">Show on map</string>
+    <string name="show_all_nearby">Show all nearby saved places</string>
+    <string name="more">More</string>
+    <string name="important_home">Home</string>
+    <string name="important_work">Work</string>
+    <string name="important_set_home">Set Home</string>
+    <string name="important_set_work">Set Work</string>
+    <string name="important_set_custom">Set %s</string>
+    <string name="important_editor_coming_soon">Setting Home and Work comes with the settings screen.</string>
+    <plurals name="distance_meters_spoken">
+        <item quantity="one">%d metre</item>
+        <item quantity="other">%d metres</item>
+    </plurals>
+    <string name="distance_km_spoken">%s kilometres</string>
 </resources>
