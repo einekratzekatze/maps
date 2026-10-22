@@ -32,6 +32,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Window
 import android.view.WindowManager
@@ -66,6 +67,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "GMapsWV"
+        private const val SPIKE_TAG = "SPIKE"
 
         private val allowedDomains = setOf(
             "apis.google.com",
@@ -225,9 +227,20 @@ class MainActivity : ComponentActivity() {
                 return null
             }
 
+            override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "history reload=$isReload url=$url")
+            }
+
+            override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "pageStarted url=$url")
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url.toString()
                 val host = request.url.host
+                if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "override gesture=${request.hasGesture()} url=$url current=${view.url}")
                 if (url == "about:blank") return false
                 if (url.startsWith("tel:")) {
                     startActivity(Intent(Intent.ACTION_DIAL, request.url))
@@ -274,6 +287,7 @@ class MainActivity : ComponentActivity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
+                if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "pageFinished url=$url")
                 view.evaluateJavascript("""
                     var head = document.getElementsByTagName('head');
                     if (head.length > 0) {
@@ -285,6 +299,8 @@ class MainActivity : ComponentActivity() {
                 """.trimIndent(), null)
             }
         }
+
+        if (BuildConfig.DEBUG) startSpikeInstrumentation()
 
         mapsWebSettings = mapsWebView!!.settings
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING) && Build.VERSION.SDK_INT >= 29) {
@@ -369,5 +385,22 @@ class MainActivity : ComponentActivity() {
     private fun removeLocationListener() {
         locationManager?.removeUpdates(locationListenerGPS!!)
         locationListenerGPS = null
+    }
+
+    // Debug-only instrumentation for the device spikes B0/N0/M0/S0 (see TODO.md "Device spikes").
+    private fun startSpikeInstrumentation() {
+        WebView.setWebContentsDebuggingEnabled(true)
+        val handler = Handler(Looper.getMainLooper())
+        var last: String? = null
+        handler.post(object : Runnable {
+            override fun run() {
+                val now = mapsWebView?.url
+                if (now != last) {
+                    Log.d(SPIKE_TAG, "poll t=${SystemClock.elapsedRealtime()} url=$now")
+                    last = now
+                }
+                handler.postDelayed(this, 250)
+            }
+        })
     }
 }
