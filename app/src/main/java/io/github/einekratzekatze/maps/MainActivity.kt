@@ -49,6 +49,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.net.toUri
+import io.github.einekratzekatze.maps.navigation.StartPress
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
@@ -241,6 +242,11 @@ class MainActivity : ComponentActivity() {
                 val url = request.url.toString()
                 val host = request.url.host
                 if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "override gesture=${request.hasGesture()} url=$url current=${view.url}")
+                if (StartPress.isStart(url, view.url)) {
+                    // Start only hands off the destination; loading its link would drop the origin (spike N0).
+                    Log.d(TAG, "[shouldOverrideUrlLoading][START] Ignored, keeping the route page")
+                    return true
+                }
                 if (url == "about:blank") return false
                 if (url.startsWith("tel:")) {
                     startActivity(Intent(Intent.ACTION_DIAL, request.url))
