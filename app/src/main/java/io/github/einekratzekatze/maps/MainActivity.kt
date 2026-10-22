@@ -19,6 +19,7 @@ package io.github.einekratzekatze.maps
 import android.Manifest
 import android.app.AlertDialog
 import android.content.ClipData
+import android.content.ComponentName
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Intent
@@ -49,7 +50,10 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.core.net.toUri
+import io.github.einekratzekatze.maps.navigation.NavLauncher
+import io.github.einekratzekatze.maps.navigation.StartDeduper
 import io.github.einekratzekatze.maps.navigation.StartPress
+import io.github.einekratzekatze.maps.navigation.StartTargetParser
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
@@ -60,6 +64,7 @@ import java.util.regex.Pattern
 class MainActivity : ComponentActivity() {
 
     private var mapsWebView: WebView? = null
+    private val startDeduper = StartDeduper(now = SystemClock::elapsedRealtime)
     private var mapsWebSettings: WebSettings? = null
     private var mapsCookieManager: CookieManager? = null
     private var locationManager: LocationManager? = null
@@ -244,7 +249,14 @@ class MainActivity : ComponentActivity() {
                 if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "override gesture=${request.hasGesture()} url=$url current=${view.url}")
                 if (StartPress.isStart(url, view.url)) {
                     // Start only hands off the destination; loading its link would drop the origin (spike N0).
-                    Log.d(TAG, "[shouldOverrideUrlLoading][START] Ignored, keeping the route page")
+                    // The press fires two navigations (https, intent://); the deduper launches once.
+                    // Unparseable links are ignored, never loaded.
+                    val handoff = StartTargetParser.parse(url)
+                    if (handoff != null && startDeduper.shouldLaunch(handoff.target)) {
+                        // TODO.md 2.2: preferred app setting, pending-drive prompt, OsmAnd deep links (later tasks)
+                        NavLauncher.launch(this@MainActivity, handoff.target, ComponentName(this@MainActivity, MainActivity::class.java))
+                    }
+                    Log.d(TAG, "[shouldOverrideUrlLoading][START] Handled (parsed=${handoff != null}), keeping the route page")
                     return true
                 }
                 if (url == "about:blank") return false
