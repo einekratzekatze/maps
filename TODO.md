@@ -24,7 +24,7 @@ it; agents must not start that work before the spike's results are written into 
   on pan, latency, does `doUpdateVisitedHistory` fire, real URLs per suffix, CSS viewport,
   in-page navigation via synthetic link click, non-map URLs.
   Spec: `floating-places-bubble.md` §0.1. Blocks: bubble B1+, markers M1+, search viewport bias.
-- [ ] **N0** (≤ 1 h) — capture Start/Directions intent fixtures, chooser-cancel lifecycle.
+- [ ] **N0** (partly done 2026-10-22, see `docs/design/spike-results.md`; fixtures in `app/src/test/resources/nav-fixtures.txt`; open: transit/bike presses, case g) (≤ 1 h) — capture Start/Directions intent fixtures, chooser-cancel lifecycle.
   Spec: `nav-handoff.md` §4.0. Blocks: N1, N2, N5.
 - [x] **M0** — done 2026-10-22: `window.google` undefined, so Renderer P (see `docs/design/spike-results.md`).
   Spec: `map-markers-js.md` §0. Blocks: M1–M7.

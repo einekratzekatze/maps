@@ -5,7 +5,7 @@ driven over adb (`input swipe/tap`, `logcat -s SPIKE`) and Chrome DevTools over
 `adb forward ... localabstract:webview_devtools_remote_<pid>` (JS probes). Coordinates in the
 captured URLs are Google's default Berlin viewport, not the owner's location.
 
-Status: **M0 done. B0 and S0 partly done. N0 not started** (needs the owner to press Directions/Start).
+Status: **M0 done. B0, S0 and N0 partly done.**
 
 ## B0 — URL and viewport behaviour
 
@@ -43,7 +43,26 @@ Status: **M0 done. B0 and S0 partly done. N0 not started** (needs the owner to p
 
 ## N0 — Start/Directions intent fixtures
 
-Not started. Needs the owner to run flows (a) to (f) in `nav-handoff.md` §4.0 on the phone while the SPIKE logs are captured. Case (g) (chooser-cancel lifecycle) cannot be tested until the nav intent launcher exists.
+Partly done 2026-10-22: the owner pressed Start/Directions while `SPIKE` logging ran. Raw events (origin redacted) are in
+`app/src/test/resources/nav-fixtures.txt`: three Start presses and one Directions press.
+Not captured: the first Directions press (place to dir), transit/bike Start presses, and case (g).
+
+| # | Finding |
+|---|---|
+| 1 | **A press produces three navigations**, in this order: (1) `https://maps.app.goo.gl/?utm_campaign=...&pcampaignid=...&apn=...&link=<encoded maps url>` with `hasGesture=true`; (2) `intent://maps.app.goo.gl/?link=<maps url>&apn=...&isi=...&ibi=...` (`hasGesture=false`); (3) an `https://play.google.com/store/apps/details?...&url=<maps url>` store fallback (already blocked by the allowlist). Step (1) really navigates the WebView to maps.app.goo.gl, which then fires (2). |
+| 2 | **`utm_campaign` does not discriminate.** Every event here has `ml-le-16204869` (an `ml-le-<number>` value), not `ml-adir-*`/`ml-navnp-*` as TODO 2.2 assumed. |
+| 3 | **The discriminator is the page URL at press time** (`webView.url`, logged as `current=`): `/maps/dir/<origin>/<dest>/...` with both segments non-empty means **Start**; `/maps/place/...` (or search) means **Directions**. |
+| 4 | **The `link` parameter never contains the origin**: it is always `/maps/dir//<destination>/@lat,lng,z/data=...` even when an origin was chosen. So a Start handoff only ever carries the destination (the native app navigates from the current location). The origin and waypoints exist only in `current`. |
+| 5 | Destination forms: a named place is `<Name>,+<Area>,+<ZIP>+<City>` plus a place id in `data` (`!1s0x...:0x...`); a dropped pin is `lat,+lon` plus `!1d<lon>!2d<lat>` in `data` (note the `1d`/`2d` order: lon first). |
+| 6 | Travel mode is in the `data` blob as `!3e<N>` (seen `0`, `2`, `3`). The usual Google convention is 0 drive, 1 bike, 2 walk, 3 transit; **not verified here**. A Start link ends in `!11m1!6b1`. |
+
+**Root cause of the owner's bug** ("Start takes me back to the screen with only Alexanderplatz as destination"): the existing upstream handling in `shouldOverrideUrlLoading` loads the `link` parameter into the WebView for every `intent://maps.app.goo.gl/?link=` URL. For a Start press that replaces the complete route page with `dir//<destination>`, dropping the origin.
+
+**Fix direction for N1/N2:** classify at step (1) (https, host `maps.app.goo.gl`, `hasGesture=true`) using `current`; for Start, block the navigation and hand off the destination (never load `link`); for Directions, keep loading `link`. Until the launcher exists, the minimal bug fix is: when `current` is a complete `/maps/dir/<o>/<d>` URL, ignore the `maps.app.goo.gl` navigation instead of loading `link`.
+
+## Geolocation ("from my location" hangs)
+
+`navigator.geolocation.getCurrentPosition` in the page timed out after 20 s (code 3) both with and without high accuracy; the location permission is granted and the permission state in the page is `prompt` (the app answers `onGeolocationPermissionsShowPrompt` itself). The device's last GPS fix was 7 days old, so the cause may be simply no fix at the test location; not diagnosed. Open: does the native Maps app get a location at the same spot? If yes, this is a WebView geolocation bug to investigate (the app only keeps the GPS provider warm in `onResume`).
 
 ## Other observations (affect the bubble and compose-host specs)
 
