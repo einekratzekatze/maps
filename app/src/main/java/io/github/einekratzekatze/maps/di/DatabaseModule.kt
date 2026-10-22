@@ -2,8 +2,10 @@ package io.github.einekratzekatze.maps.di
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import dagger.Module
@@ -40,7 +42,11 @@ object DatabaseModule {
     /** The single app-wide preferences DataStore (one file; features add keys, never a second delegate). */
     @Provides @Singleton
     fun preferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
-        PreferenceDataStoreFactory.create(produceFile = { context.preferencesDataStoreFile("app_prefs") })
+        PreferenceDataStoreFactory.create(
+            // A corrupt file falls back to defaults instead of crashing (floating-places-bubble.md §4.6).
+            corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+            produceFile = { context.preferencesDataStoreFile("app_prefs") },
+        )
     @Provides fun placeDao(db: AppDatabase): PlaceDao = db.placeDao()
     @Provides fun importantLocationDao(db: AppDatabase): ImportantLocationDao = db.importantLocationDao()
     @Provides fun placeListDao(db: AppDatabase): PlaceListDao = db.placeListDao()

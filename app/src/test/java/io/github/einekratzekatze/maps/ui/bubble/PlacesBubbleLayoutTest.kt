@@ -12,6 +12,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
@@ -65,6 +69,7 @@ class PlacesBubbleLayoutTest {
     )
 
     private var state by mutableStateOf(visible)
+    private val anchors = mutableListOf<BubbleAnchor>()
 
     private fun show(initial: BubbleUiState, anchor: BubbleAnchor = BubbleAnchor.Default, under: (() -> Unit)? = null) {
         state = initial
@@ -72,7 +77,7 @@ class PlacesBubbleLayoutTest {
             AppTheme {
                 Box(Modifier.size(360.dp, 720.dp)) {
                     if (under != null) Box(Modifier.fillMaxSize().testTag("under").clickable { under() })
-                    PlacesBubbleLayout(state, anchor, {}, actions, Modifier.fillMaxSize())
+                    PlacesBubbleLayout(state, anchor, { anchors += it }, actions, Modifier.fillMaxSize())
                 }
             }
         }
@@ -174,5 +179,61 @@ class PlacesBubbleLayoutTest {
         rule.onNodeWithText("Navigate").performClick()
         rule.onNodeWithText("Show on map").performClick()
         assertEquals(listOf("all", "nav 1", "place 1"), actions.calls)
+    }
+
+    @Test fun dragToTheLeftSnapsToStart() { // T-C7
+        show(visible)
+        rule.onNodeWithTag(BubbleTestTags.Bubble).performTouchInput {
+            down(center)
+            moveBy(Offset(-width * 3f, 0f), delayMillis = 100)
+            up()
+        }
+        rule.mainClock.advanceTimeBy(1000)
+        val left = rule.onNodeWithTag(BubbleTestTags.Bubble).getBoundsInRoot().left.value
+        assertEquals(12f, left, 1f)
+        assertEquals(EdgeSide.Start, anchors.single().side)
+        assertTrue(actions.calls.isEmpty())
+    }
+
+    @Test fun smallMovementIsATap() { // T-C8
+        show(visible)
+        rule.onNodeWithTag(BubbleTestTags.Bubble).performTouchInput {
+            down(center)
+            moveBy(Offset(2f, 2f))
+            up()
+        }
+        assertEquals(listOf("tap"), actions.calls)
+        assertTrue(anchors.isEmpty())
+    }
+
+    @Test fun semanticsAndCustomActions() { // T-C11
+        show(visible.copy(badge = BadgeState.Count(7, false)))
+        val bubble = rule.onNodeWithTag(BubbleTestTags.Bubble)
+        bubble.assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Saved places")))
+        bubble.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "7 in view"))
+        val action = bubble.fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Move to left edge" }
+        rule.runOnIdle { action.action() }
+        rule.mainClock.advanceTimeBy(1000)
+        assertEquals(BubbleAnchor(EdgeSide.Start, BubbleAnchor.Default.yFraction), anchors.single())
+        assertEquals(12f, rule.onNodeWithTag(BubbleTestTags.Bubble).getBoundsInRoot().left.value, 1f)
+    }
+
+    @Test fun interruptedSettlePersistsTheTargetOnce() { // T-C14
+        show(visible)
+        rule.mainClock.autoAdvance = false
+        val bubble = rule.onNodeWithTag(BubbleTestTags.Bubble)
+        bubble.performTouchInput {
+            down(center)
+            repeat(3) { moveBy(Offset(-width * 2f, 0f), delayMillis = 16) } // centre ends well inside the left half
+        }
+        rule.mainClock.advanceTimeBy(100)
+        bubble.performTouchInput { up() }
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeByFrame()
+        // A new touch lands before the spring has finished.
+        bubble.performTouchInput { down(center) }
+        rule.mainClock.advanceTimeBy(500)
+        assertEquals(1, anchors.size)
+        assertEquals(EdgeSide.Start, anchors.single().side)
     }
 }
