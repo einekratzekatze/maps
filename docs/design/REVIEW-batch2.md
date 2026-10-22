@@ -196,3 +196,24 @@ UI behaviour.
 - Lint output was checked only for errors (the gate passed); individual warnings in the new files were not reviewed.
 - That the Hilt graph resolves the repositories at runtime. Nothing injects them yet, so Hilt has not validated those
   bindings beyond compiling the modules.
+
+## 6. Resolution (applied 2026-10-22)
+
+Each fixed item has a test that was verified to fail with the fix reverted (SF-1, SF-2 both tests, SF-4, N-1).
+
+| Item | Status | Resolution |
+|---|---|---|
+| SF-1 | fixed | `ListRepository` is `@Singleton`; `getOrCreateDrivesList` runs under a `Mutex`. `concurrentDrivesListCreationYieldsOneList` (4 concurrent callers, slow store) fails without it. |
+| SF-2 | fixed | `inBoundsAntimeridianOrderUsesWrappedDistance` (-179.99 / 179.80 around 179.95) and `inBoundsTiesByIdAndLimit` (equidistant rows whose index order disagrees with id order). Both fail with the `CASE` wrap / `, id` removed. |
+| SF-3 | fixed | `DriveDraft` removed. `domain.RouteInfo` (nav-handoff 4.2, `isSavable`) is the input; `insert` requires destination coordinates. `SavedDrive` kept as read model. `RouteInfo.mode` is `navigation.TravelMode?` (see N-7). |
+| SF-4 | fixed | `encode` writes invalid/non-finite points as absent (no `JSONException`); `decode` uses `LatLon.ofOrNull`; the repository normalises waypoint longitudes. |
+| N-1 | fixed | `OR (:east = 180 AND lon = -180)` in both bounds queries; schema.md 2.2/2.3 amended first. |
+| N-2 | fixed | `nextCustomSortOrder()` `@Query` in the DAO; read+insert in `db.withTransaction`. schema.md 2.3 amended. |
+| N-3 | fixed | `DriveRepository.observeByList` uses `flowOn(io)`. |
+| N-4 | fixed | Both searches return an empty list for a blank query (documented in KDoc and schema.md 4); tested for recents. `PlacesRepository.search` stays un-wrapped in `withContext` (Room suspend DAOs are main-safe) - deferred, no behaviour change. |
+| N-5 | fixed | `require(limit > 0)` / `require(keep > 0)`; tested. |
+| N-6 | partly fixed | `addPlace` rejects missing and EXTERNAL lists. Deferred: `ListRepository.create(EXTERNAL)` and `update` flipping `type` stay, because DB5 will create EXTERNAL lists through this path. |
+| N-7 | partly fixed | `RoutePoint.isCurrentLocation` added; the wrong KDoc is gone with `DriveDraft`. Deferred: the two `TravelMode` enums stay (decision needed when nav-handoff N-tasks land). |
+| N-8 | fixed | One shared `DataStore<Preferences>` (`app_prefs`) in `DatabaseModule`; `DataStoreDrivesListIdStore` injects it. Round-trip test added. Noted in schema.md 4. |
+| N-9 | fixed | `AppDatabase.configure(builder)` is used by the module and by `DbTestBase`. |
+| N-10 | deferred | Remaining edge-case tests (hidden-sublist rows vs limit, stored id pointing at an EXTERNAL list, recents ordering) are not added; the unused DAO `@Provides` stay for later ViewModels. DataStore test was added. |

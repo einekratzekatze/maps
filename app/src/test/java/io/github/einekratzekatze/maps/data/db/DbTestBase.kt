@@ -11,8 +11,7 @@ abstract class DbTestBase {
 
     @Before fun openDb() {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
-        db = Room.inMemoryDatabaseBuilder(ctx, AppDatabase::class.java)
-            .addCallback(AppDatabase.SeedCallback)
+        db = AppDatabase.configure(Room.inMemoryDatabaseBuilder(ctx, AppDatabase::class.java))
             .allowMainThreadQueries()
             .build()
     }

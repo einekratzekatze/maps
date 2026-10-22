@@ -31,5 +31,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         const val FILE_NAME = "maps.db"
+
+        /** The one place the production configuration (seeding) is applied; tests use it too. */
+        fun configure(builder: Builder<AppDatabase>): Builder<AppDatabase> = builder.addCallback(SeedCallback)
     }
 }

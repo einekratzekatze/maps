@@ -231,6 +231,7 @@ interface PlaceDao {
             WHERE (s.id IS NULL OR s.visible = 1)
               AND p.lat BETWEEN :south AND :north
               AND ( (:west <= :east AND p.lon BETWEEN :west AND :east)
+                 OR (:east = 180 AND p.lon = -180)
                  OR (:west >  :east AND (p.lon >= :west OR p.lon <= :east)) )
         )
         ORDER BY dLat * dLat + dLonScaled * dLonScaled, id
@@ -304,6 +305,7 @@ interface ImportantLocationDao {
         WHERE lat IS NOT NULL AND lon IS NOT NULL
           AND lat BETWEEN :south AND :north
           AND ( (:west <= :east AND lon BETWEEN :west AND :east)
+             OR (:east = 180 AND lon = -180)
              OR (:west >  :east AND (lon >= :west OR lon <= :east)) )
         ORDER BY sortOrder, id
     """)
@@ -313,6 +315,10 @@ interface ImportantLocationDao {
     suspend fun setLocation(id: Long, lat: Double?, lon: Double?, address: String?, now: Long)
 
     @Insert suspend fun insertCustom(row: ImportantLocation): Long     // repository asserts kind == CUSTOM, label != null
+
+    /** Customs start at 10; read and insert run in one transaction in the repository. */
+    @Query("SELECT COALESCE(MAX(sortOrder), 9) + 1 FROM ImportantLocation WHERE kind = 'CUSTOM'")
+    suspend fun nextCustomSortOrder(): Int
 
     @Query("DELETE FROM ImportantLocation WHERE id = :id AND kind = 'CUSTOM'")
     suspend fun deleteCustom(id: Long): Int
@@ -451,6 +457,21 @@ class DriveRepository  // insert(RouteInfo, listId), replay lookup
 class RecentSearchRepository
 class ExternalListRepository
 ```
+
+Conventions (as implemented):
+
+- Every repository also takes a `java.time.Clock` (provided in `di/`); `createdAt`/`updatedAt`/`timestamp` come from
+  `clock.millis()` so tests can fix time. Repositories take `AppDatabase` and use its DAOs.
+- `DriveRepository.insert(route: RouteInfo, listId)` takes `domain.RouteInfo` (nav-handoff 4.2) and requires
+  `destination.latLon != null`. Waypoint coordinates are validated/normalised; invalid ones are stored as absent.
+  `RouteInfo.mode` is `navigation.TravelMode?` (null = UNKNOWN); the storage enum is mapped in the repository.
+- `ListRepository` is `@Singleton`; `getOrCreateDrivesList(defaultName, color)` is serialised by a `Mutex`.
+- DataStore: there is **one** app-wide `DataStore<Preferences>` (file `app_prefs`) provided in `di/DatabaseModule`.
+  Features inject it and add keys (`drives_default_list_id` is one); nobody creates a second `preferencesDataStore`
+  delegate for another file name without a reason.
+- `limit`/`keep` arguments must be positive (`IllegalArgumentException`). A blank query returns an empty list from
+  both `PlacesRepository.search` and `RecentSearchRepository.search`; the empty field shows `observeRecent`.
+- `addPlace` throws for a missing or `EXTERNAL` list (external lists are read-only).
 
 `observeInBounds` computes `cosLat = cos(toRadians(center.lat))` and passes it to the DAO.
 

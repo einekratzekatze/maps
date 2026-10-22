@@ -28,6 +28,7 @@ interface PlaceDao {
             WHERE (s.id IS NULL OR s.visible = 1)
               AND p.lat BETWEEN :south AND :north
               AND ( (:west <= :east AND p.lon BETWEEN :west AND :east)
+                 OR (:east = 180 AND p.lon = -180)
                  OR (:west >  :east AND (p.lon >= :west OR p.lon <= :east)) )
         )
         ORDER BY dLat * dLat + dLonScaled * dLonScaled, id
@@ -92,6 +93,7 @@ interface ImportantLocationDao {
         WHERE lat IS NOT NULL AND lon IS NOT NULL
           AND lat BETWEEN :south AND :north
           AND ( (:west <= :east AND lon BETWEEN :west AND :east)
+             OR (:east = 180 AND lon = -180)
              OR (:west >  :east AND (lon >= :west OR lon <= :east)) )
         ORDER BY sortOrder, id
     """)
@@ -101,6 +103,10 @@ interface ImportantLocationDao {
     suspend fun setLocation(id: Long, lat: Double?, lon: Double?, address: String?, now: Long)
 
     @Insert suspend fun insertCustom(row: ImportantLocation): Long
+
+    /** Next sortOrder for a CUSTOM row: customs start at 10. */
+    @Query("SELECT COALESCE(MAX(sortOrder), 9) + 1 FROM ImportantLocation WHERE kind = 'CUSTOM'")
+    suspend fun nextCustomSortOrder(): Int
 
     @Query("DELETE FROM ImportantLocation WHERE id = :id AND kind = 'CUSTOM'")
     suspend fun deleteCustom(id: Long): Int

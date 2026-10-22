@@ -13,6 +13,7 @@ import java.time.ZoneOffset
 import kotlin.math.cos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,17 +72,25 @@ class PlacesRepositoryTest : DbTestBase() {
         assertEquals("L", rows[0].listName)
     }
 
-    @Test fun inBoundsAntimeridian() = runBlocking {
-        add("east", 0.0, 179.9)
-        add("west", 0.0, -179.9)
+    @Test fun inBoundsAntimeridianOrderUsesWrappedDistance() = runBlocking {
+        add("wrapped-near", 0.0, -179.99) // wrapped distance 0.06 from the centre
+        add("plain-far", 0.0, 179.80)     // distance 0.15; without the wrap -179.99 would be 359.94 away
         add("middle", 0.0, 0.0)
-        val rows = repo.observeInBounds(bounds(-1.0, 179.0, 1.0, -179.0), LatLon(0.0, 179.95), 100).first()
-        assertEquals(setOf("east", "west"), rows.map { it.name }.toSet())
-        // Center at 179.95: "east" is 0.05 away, "west" 0.15 away (wrapped), so east first.
-        assertEquals(listOf("east", "west"), rows.map { it.name })
-        // Center on the other side: west first.
-        val rows2 = repo.observeInBounds(bounds(-1.0, 179.0, 1.0, -179.0), LatLon(0.0, -179.95), 100).first()
-        assertEquals(listOf("west", "east"), rows2.map { it.name })
+        val b = bounds(-1.0, 179.0, 1.0, -179.0)
+        val rows = repo.observeInBounds(b, LatLon(0.0, 179.95), 100).first()
+        assertEquals(listOf("wrapped-near", "plain-far"), rows.map { it.name })
+        val rows2 = repo.observeInBounds(b, LatLon(0.0, -179.95), 100).first()
+        assertEquals(listOf("wrapped-near", "plain-far"), rows2.map { it.name })
+    }
+
+    @Test fun inBoundsEastEdge180MatchesPlaceStoredAtMinus180() = runBlocking {
+        val id = add("edge", 0.0, 180.0) // stored as -180
+        assertEquals(-180.0, db.placeDao().observeByList(listId).first().single().lon, 0.0)
+        val rows = repo.observeInBounds(bounds(-1.0, 170.0, 1.0, 180.0), LatLon(0.0, 175.0), 10).first()
+        assertEquals(listOf(id), rows.map { it.id })
+        repo.setImportant(1, LatLon(0.0, 180.0), null)
+        assertEquals(listOf(1L), repo.observeImportantInBounds(bounds(-1.0, 170.0, 1.0, 180.0)).first().map { it.id })
+        assertTrue(repo.observeImportantInBounds(bounds(-1.0, 100.0, 1.0, 170.0)).first().isEmpty())
     }
 
     @Test fun inBoundsOrderingAndCap() = runBlocking {
@@ -106,12 +115,31 @@ class PlacesRepositoryTest : DbTestBase() {
         assertEquals(expected.first(), rows.first().name)
     }
 
-    @Test fun inBoundsTiesByIdAndLimitSmall() = runBlocking {
-        val a = add("a", 1.0, 1.0)
-        val b = add("b", 1.0, 1.0)
-        add("far", 2.0, 2.0)
-        val rows = repo.observeInBounds(bounds(0.0, 0.0, 3.0, 3.0), LatLon(1.0, 1.0), 2).first()
+    @Test fun inBoundsTiesByIdAndLimit() = runBlocking {
+        // Equidistant from (1,1); index order is by lat (b before a), id order is a before b.
+        val a = add("a", 1.5, 1.0)
+        val b = add("b", 0.5, 1.0)
+        add("far", 3.0, 1.0)
+        val rows = repo.observeInBounds(bounds(0.0, 0.0, 4.0, 3.0), LatLon(1.0, 1.0), 2).first()
         assertEquals(listOf(a, b), rows.map { it.id })
+    }
+
+    @Test fun addPlaceRejectsExternalOrMissingList() {
+        val ext = runBlocking { db.placeListDao().insert(PlaceList(name = "E", color = 1, type = ListType.EXTERNAL, createdAt = 1)) }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.addPlace(ext, "x", LatLon(0.0, 0.0), null, null) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.addPlace(9999, "x", LatLon(0.0, 0.0), null, null) } }
+    }
+
+    @Test fun limitMustBePositive() {
+        assertThrows(IllegalArgumentException::class.java) { repo.observeInBounds(bounds(0.0, 0.0, 1.0, 1.0), LatLon(0.0, 0.0), 0) }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { repo.search("a", null, -1) } }
+    }
+
+    @Test fun customSortOrderIsAssignedInsideTransactionConcurrently() = runBlocking {
+        val ids = (1..5).map { i -> this.async(Dispatchers.Default) { repo.addCustomImportant("c$i", null, null) } }
+            .map { it.await() }
+        val orders = repo.observeImportant().first().filter { it.id in ids }.map { it.sortOrder }
+        assertEquals(listOf(10, 11, 12, 13, 14), orders.sorted())
     }
 
     @Test fun hasAnyPlacesAndDetail() = runBlocking {

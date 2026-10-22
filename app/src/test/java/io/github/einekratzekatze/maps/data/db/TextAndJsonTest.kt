@@ -36,6 +36,17 @@ class TextAndJsonTest {
         assertEquals("[]", WaypointJson.encode(emptyList()))
     }
 
+    @Test fun waypointEncodeNeverThrowsAndDecodeValidates() {
+        val enc = WaypointJson.encode(listOf(RoutePoint("n", LatLon(Double.NaN, 1.0)), RoutePoint("i", LatLon(1.0, Double.POSITIVE_INFINITY))))
+        assertEquals(listOf(RoutePoint("n", null), RoutePoint("i", null)), WaypointJson.decode(enc))
+        assertEquals(listOf(RoutePoint(null, null)), WaypointJson.decode("""[{"lat":999,"lon":5000}]"""))
+    }
+
+    @Test fun routePointCurrentLocation() {
+        assertEquals(true, RoutePoint(null, null).isCurrentLocation)
+        assertEquals(false, RoutePoint("x", null).isCurrentLocation)
+    }
+
     @Test fun waypointMalformedIsEmpty() {
         assertEquals(emptyList<RoutePoint>(), WaypointJson.decode("not json"))
         assertEquals(emptyList<RoutePoint>(), WaypointJson.decode("{\"a\":1}"))

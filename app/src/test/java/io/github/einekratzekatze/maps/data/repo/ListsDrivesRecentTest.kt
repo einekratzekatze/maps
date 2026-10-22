@@ -4,6 +4,7 @@ import io.github.einekratzekatze.maps.data.db.DbTestBase
 import io.github.einekratzekatze.maps.data.db.ListType
 import io.github.einekratzekatze.maps.data.db.TravelMode as DbMode
 import io.github.einekratzekatze.maps.domain.LatLon
+import io.github.einekratzekatze.maps.domain.RouteInfo
 import io.github.einekratzekatze.maps.domain.RoutePoint
 import io.github.einekratzekatze.maps.navigation.TravelMode
 import java.time.Clock
@@ -11,10 +12,12 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -27,15 +30,15 @@ private class MutableClock(var now: Long) : Clock() {
     override fun instant(): Instant = Instant.ofEpochMilli(now)
 }
 
-private class FakeStore(var id: Long? = null) : DrivesListIdStore {
-    override suspend fun get() = id
+private class FakeStore(var id: Long? = null, val delayMs: Long = 0) : DrivesListIdStore {
+    override suspend fun get(): Long? { if (delayMs > 0) kotlinx.coroutines.delay(delayMs); return id }
     override suspend fun set(id: Long) { this.id = id }
 }
 
 @RunWith(RobolectricTestRunner::class)
 class ListsDrivesRecentTest : DbTestBase() {
     private val clock = MutableClock(1000)
-    private val store = FakeStore()
+    private var store = FakeStore()
     private lateinit var lists: ListRepository
     private lateinit var drives: DriveRepository
     private lateinit var recents: RecentSearchRepository
@@ -48,11 +51,10 @@ class ListsDrivesRecentTest : DbTestBase() {
         places = PlacesRepository(db, Dispatchers.Unconfined, clock)
     }
 
-    private fun draft(mode: TravelMode? = TravelMode.Bike, originLatLon: LatLon? = LatLon(1.0, 2.0)) = DriveDraft(
+    private fun draft(mode: TravelMode? = TravelMode.Bike, originLatLon: LatLon? = LatLon(1.0, 2.0)) = RouteInfo(
         origin = RoutePoint("A", originLatLon),
         waypoints = listOf(RoutePoint("W", LatLon(3.0, 4.0)), RoutePoint(null, LatLon(5.0, 6.0))),
         destination = RoutePoint("B", LatLon(7.0, 8.0)),
-        destinationLatLon = LatLon(7.0, 8.0),
         mode = mode,
     )
 
@@ -89,7 +91,39 @@ class ListsDrivesRecentTest : DbTestBase() {
         assertEquals(id2, store.id)
     }
 
+    @Test fun concurrentDrivesListCreationYieldsOneList() = runBlocking {
+        store = FakeStore(delayMs = 50)
+        lists = ListRepository(db, store, Dispatchers.Default, clock)
+        val ids = (1..4).map { this.async(Dispatchers.Default) { lists.getOrCreateDrivesList("Drives", 9) } }
+            .map { it.await() }
+        assertEquals(1, ids.toSet().size)
+        assertEquals(1, lists.observeAllWithCounts().first().size)
+    }
+
     // ---- drives ----
+
+    @Test fun driveWithoutDestinationCoordinatesIsRejected() {
+        val l = runBlocking { lists.create("D", 1) }
+        val bad = draft().copy(destination = RoutePoint("B", null))
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { drives.insert(bad, l) } }
+    }
+
+    @Test fun driveInvalidWaypointCoordinatesAreDroppedNotCrashing() = runBlocking {
+        val l = lists.create("D", 1)
+        val route = draft().copy(waypoints = listOf(
+            RoutePoint("nan", LatLon(Double.NaN, 1.0)),
+            RoutePoint("wrap", LatLon(10.0, 190.0)),
+            RoutePoint("bad", LatLon(999.0, 5.0)),
+        ))
+        val got = drives.get(drives.insert(route, l))!!.route.waypoints
+        assertEquals(listOf(RoutePoint("nan", null), RoutePoint("wrap", LatLon(10.0, -170.0)), RoutePoint("bad", null)), got)
+    }
+
+    @Test fun observeByListEmitsDecodedRoutes() = runBlocking {
+        val l = lists.create("D", 1)
+        drives.insert(draft(), l)
+        assertEquals(draft(), drives.observeByList(l).first().single().route)
+    }
 
     @Test fun driveRoundTripAndOrdering() = runBlocking {
         val l = lists.create("D", 1)
@@ -143,6 +177,14 @@ class ListsDrivesRecentTest : DbTestBase() {
         assertEquals(20, r.size)
         assertEquals("q22", r.first().query)
         assertEquals("q3", r.last().query)
+    }
+
+    @Test fun recentBlankSearchIsEmptyAndArgsValidated() = runBlocking {
+        recents.record("abc")
+        assertTrue(recents.search("   ").isEmpty())
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { recents.record("x", keep = 0) } }
+        assertThrows(IllegalArgumentException::class.java) { runBlocking { recents.search("a", limit = 0) } }
+        assertEquals(1, recents.observeRecent().first().size)
     }
 
     @Test fun recentSearchDeleteAndEscape() = runBlocking {

@@ -3,6 +3,7 @@ package io.github.einekratzekatze.maps.data.repo
 import io.github.einekratzekatze.maps.data.db.AppDatabase
 import io.github.einekratzekatze.maps.data.db.ImportantKind
 import io.github.einekratzekatze.maps.data.db.ImportantLocation
+import io.github.einekratzekatze.maps.data.db.ListType
 import io.github.einekratzekatze.maps.data.db.NearbyPlaceRow
 import io.github.einekratzekatze.maps.data.db.Place
 import io.github.einekratzekatze.maps.data.db.PlaceDetailRow
@@ -13,6 +14,7 @@ import io.github.einekratzekatze.maps.domain.LatLon
 import io.github.einekratzekatze.maps.domain.normalizeLon
 import java.time.Clock
 import javax.inject.Inject
+import androidx.room.withTransaction
 import kotlin.math.cos
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +28,10 @@ internal fun LatLon.normalizedForStorage(): LatLon {
     return LatLon(lat, if (lon >= -180.0 && lon < 180.0) lon else normalizeLon(lon))
 }
 
+/** Like [normalizedForStorage] but returns null instead of throwing (for optional points such as waypoints). */
+internal fun LatLon.normalizedOrNull(): LatLon? =
+    if (lat.isFinite() && lon.isFinite() && lat in -90.0..90.0) normalizedForStorage() else null
+
 private fun cosLat(lat: Double): Double = cos(Math.toRadians(lat))
 
 class PlacesRepository @Inject constructor(
@@ -36,11 +42,13 @@ class PlacesRepository @Inject constructor(
     private val places get() = db.placeDao()
     private val important get() = db.importantLocationDao()
 
-    fun observeInBounds(bounds: GeoBounds, center: LatLon, limit: Int): Flow<List<NearbyPlaceRow>> =
-        places.observeInBounds(
+    fun observeInBounds(bounds: GeoBounds, center: LatLon, limit: Int): Flow<List<NearbyPlaceRow>> {
+        require(limit > 0) { "limit must be positive" }
+        return places.observeInBounds(
             bounds.south, bounds.west, bounds.north, bounds.east,
             center.lat, center.lon, cosLat(center.lat), limit,
         )
+    }
 
     fun observeHasAnyPlaces(): Flow<Boolean> = places.observeHasAnyPlaces()
     fun observeDetail(id: Long): Flow<PlaceDetailRow?> = places.observeDetail(id)
@@ -48,7 +56,9 @@ class PlacesRepository @Inject constructor(
     fun observeImportantInBounds(bounds: GeoBounds): Flow<List<ImportantLocation>> =
         important.observeInBounds(bounds.south, bounds.west, bounds.north, bounds.east)
 
+    /** A blank query returns no places (suggestions need input; recents cover the empty field). */
     suspend fun search(query: String, center: LatLon?, limit: Int): List<NearbyPlaceRow> {
+        require(limit > 0) { "limit must be positive" }
         val n = TextNormalizer.normalize(query)
         if (n.isEmpty()) return emptyList()
         val esc = TextNormalizer.escapeLike(n)
@@ -64,6 +74,8 @@ class PlacesRepository @Inject constructor(
     suspend fun addPlace(listId: Long, name: String, latLon: LatLon, address: String?, notes: String?): Long =
         withContext(io) {
             val p = latLon.normalizedForStorage()
+            val list = requireNotNull(db.placeListDao().get(listId)) { "no such list: $listId" }
+            require(list.type == ListType.NORMAL) { "EXTERNAL lists are read-only" }
             places.insert(
                 Place(
                     listId = listId, name = name, nameNormalized = TextNormalizer.normalize(name),
@@ -88,16 +100,15 @@ class PlacesRepository @Inject constructor(
         require(label.isNotBlank()) { "custom important location needs a label" }
         val p = latLon?.normalizedForStorage()
         val now = clock.millis()
-        // sortOrder: customs from 10 up.
-        val next = db.openHelper.readableDatabase
-            .query("SELECT COALESCE(MAX(sortOrder), 9) + 1 FROM ImportantLocation WHERE kind = 'CUSTOM'")
-            .use { c -> c.moveToFirst(); c.getInt(0) }
-        important.insertCustom(
-            ImportantLocation(
-                kind = ImportantKind.CUSTOM, label = label.trim(), lat = p?.lat, lon = p?.lon,
-                address = if (p == null) null else address, sortOrder = next, updatedAt = now,
-            ),
-        )
+        db.withTransaction {
+            important.insertCustom(
+                ImportantLocation(
+                    kind = ImportantKind.CUSTOM, label = label.trim(), lat = p?.lat, lon = p?.lon,
+                    address = if (p == null) null else address,
+                    sortOrder = important.nextCustomSortOrder(), updatedAt = now,
+                ),
+            )
+        }
     }
 
     /** True if a CUSTOM row was deleted; HOME/WORK are never deleted. */

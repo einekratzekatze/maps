@@ -7,6 +7,9 @@ import io.github.einekratzekatze.maps.data.db.PlaceList
 import io.github.einekratzekatze.maps.di.IoDispatcher
 import java.time.Clock
 import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -17,6 +20,7 @@ interface DrivesListIdStore {
     suspend fun set(id: Long)
 }
 
+@Singleton
 class ListRepository @Inject constructor(
     private val db: AppDatabase,
     private val drivesListIdStore: DrivesListIdStore,
@@ -24,6 +28,7 @@ class ListRepository @Inject constructor(
     private val clock: Clock,
 ) {
     private val lists get() = db.placeListDao()
+    private val drivesListLock = Mutex()
 
     fun observeAllWithCounts(): Flow<List<ListWithCount>> = lists.observeAllWithCounts()
     fun observeWritable(): Flow<List<PlaceList>> = lists.observeWritable()
@@ -45,12 +50,14 @@ class ListRepository @Inject constructor(
      * named [defaultName] (names are localised, so the caller passes it) whose id is stored.
      */
     suspend fun getOrCreateDrivesList(defaultName: String, color: Int): Long = withContext(io) {
+        drivesListLock.withLock {
         val stored = drivesListIdStore.get()
-        if (stored != null && lists.get(stored)?.type == ListType.NORMAL) return@withContext stored
+        if (stored != null && lists.get(stored)?.type == ListType.NORMAL) return@withLock stored
         val id = lists.insert(
             PlaceList(name = defaultName, color = color, sortOrder = 0, type = ListType.NORMAL, createdAt = clock.millis()),
         )
         drivesListIdStore.set(id)
         id
+    }
     }
 }

@@ -16,9 +16,11 @@ object WaypointJson {
         for (p in points) {
             val o = JSONObject()
             o.put("label", p.label ?: JSONObject.NULL)
-            if (p.latLon != null) {
-                o.put("lat", p.latLon.lat)
-                o.put("lon", p.latLon.lon)
+            // Never throws: non-finite or out-of-range coordinates are written as absent.
+            val ll = p.latLon?.let { LatLon.ofOrNull(it.lat, it.lon) }
+            if (ll != null) {
+                o.put("lat", ll.lat)
+                o.put("lon", ll.lon)
             }
             arr.put(o)
         }
@@ -33,7 +35,7 @@ object WaypointJson {
             val hasLat = o.has("lat") && !o.isNull("lat")
             val hasLon = o.has("lon") && !o.isNull("lon")
             // lat/lon are both present or both absent; a lone one counts as absent.
-            val latLon = if (hasLat && hasLon) LatLon(o.getDouble("lat"), o.getDouble("lon")) else null
+            val latLon = if (hasLat && hasLon) LatLon.ofOrNull(o.getDouble("lat"), o.getDouble("lon")) else null
             RoutePoint(label, latLon)
         }
     } catch (e: JSONException) {

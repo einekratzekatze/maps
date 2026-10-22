@@ -19,15 +19,22 @@ class RecentSearchRepository @Inject constructor(
 
     /** Stores a submitted query (trimmed; blank is ignored). A repeat moves to the top; at most [keep] rows remain. */
     suspend fun record(query: String, keep: Int = MAX_RECENT) = withContext(io) {
+        require(keep > 0) { "keep must be positive" }
         val trimmed = query.trim()
         val normalized = TextNormalizer.normalize(trimmed)
         if (normalized.isEmpty()) return@withContext
         dao.record(RecentSearch(query = trimmed, queryNormalized = normalized, timestamp = clock.millis()), keep)
     }
 
-    fun observeRecent(limit: Int = MAX_RECENT): Flow<List<RecentSearch>> = dao.observeRecent(limit)
+    fun observeRecent(limit: Int = MAX_RECENT): Flow<List<RecentSearch>> {
+        require(limit > 0) { "limit must be positive" }
+        return dao.observeRecent(limit)
+    }
 
+    /** A blank query returns no entries, like [PlacesRepository.search]; use [observeRecent] for the empty field. */
     suspend fun search(query: String, limit: Int = MAX_RECENT): List<RecentSearch> = withContext(io) {
+        require(limit > 0) { "limit must be positive" }
+        if (TextNormalizer.normalize(query).isEmpty()) return@withContext emptyList()
         dao.search("%${TextNormalizer.escapeLike(TextNormalizer.normalize(query))}%", limit)
     }
 
