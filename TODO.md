@@ -71,17 +71,17 @@ in `docs/design/REVIEW.md` §5; specs do not pin them.
 - [x] DataStore Preferences (`datastore-preferences`)
 - [x] WorkManager (`work-runtime-ktx`)
 - [x] Kotlin Coroutines (`kotlinx-coroutines-android`)
-- [ ] Lifecycle ViewModel + Compose integration (`lifecycle-viewmodel-compose`, `lifecycle-runtime-compose`)
-      > partial: `lifecycle-viewmodel-compose` added (39360e9); `lifecycle-runtime-compose` still missing
-- [ ] Test deps: JUnit, `kotlinx-coroutines-test`, Turbine, Robolectric ≥ 4.16 (SDK 36),
+- [x] Lifecycle ViewModel + Compose integration (`lifecycle-viewmodel-compose`, `lifecycle-runtime-compose`)
+- [x] Test deps: JUnit, `kotlinx-coroutines-test`, Turbine, Robolectric ≥ 4.16 (SDK 36),
   `compose-ui-test-junit4`, `ui-test-manifest`; `testOptions.unitTests.includeAndroidResources = true`
+  (plus `hilt-android-testing` for Robolectric activity tests)
 
 ### 0.3 Project architecture skeleton
 
 **Verification:** `[build]`
 - [x] Set up Hilt `@HiltAndroidApp` in `Application` subclass
 - [x] Add `@AndroidEntryPoint` to `MainActivity`
-- [ ] Create package structure:
+- [x] Create package structure:
   ```
   ui/          — Compose screens and components
   data/        — Room DB, DAOs, repositories
@@ -124,15 +124,15 @@ Directions mode, badge counts distinct places).
 **Spec:** `docs/design/compose-host.md`. Prerequisite of every feature spec.
 
 **Verification:** `[needs device]` + `[unit-testable]` (see spec §9)
-- [ ] **1.3a** Host and insets: `enableEdgeToEdge()`; remove `clearFlags`,
+- [x] **1.3a** (code done, device checks D-H1–D-H7 open) Host and insets: `enableEdgeToEdge()`; remove `clearFlags`,
   `FEATURE_NO_TITLE`, `fitsSystemWindows`, `activity_main.xml`; NoActionBar theme;
   `adjustResize`; extend `configChanges` (fontScale, density, locale, layoutDirection,
   keyboard, keyboardHidden, navigation, …); keep the cookie wipe out of recreation paths;
   `WebViewHost` as the single WebView owner; `AndroidView(factory = { host.webView })`;
   `Scaffold` + `Box` with insets applied once (`consumeWindowInsets`)
-- [ ] **1.3b** `MapController`, `MapCommands`, `MapStateRepository`, `WebViewTouchObserver`,
+- [x] **1.3b** (code done, device check D-H8 open; `MapUrlTracker` + 1 s poll left to bubble B2a) `MapController`, `MapCommands`, `MapStateRepository`, `WebViewTouchObserver`,
   `PageScript`/`GmwBridge`, DI modules (`@DefaultDispatcher`, `@RetainedScope`), `MapBackHandler`
-- [ ] **1.3c** Shared types `LatLon`, `MapCamera`, `GeoBounds`, `MapMode`, `NavTarget`, `MapUrls`
+- [x] **1.3c** Shared types `LatLon`, `MapCamera`, `GeoBounds`, `MapMode`, `NavTarget`, `MapUrls`
 
 ---
 

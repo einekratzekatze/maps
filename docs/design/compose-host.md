@@ -469,3 +469,20 @@ in practice; the explicit order covers the rest.
 | D-H6 | Back: history-back as before; at the start page the app closes |
 | D-H7 | Swipe the app away and reopen: cookies wiped, start URL (upstream behaviour unchanged) |
 | D-H8 | With a debug log on `touches`: single tap → one `Tap` after ~300 ms; double-tap zoom → no `Tap`; pan → `GestureStart`/`GestureEnd` |
+
+## 11. Implementation notes (1.3a/1.3b, 2026-10-22)
+
+Where the code differs from the sections above:
+- `MapStateRepository` takes no `@RetainedScope`: `urlState` is computed in `reportUrl` instead
+  of `stateIn`, so `url` and its parse never disagree. `@RetainedScope` exists for later users.
+- `MapController.navigateInPage` is `loadUrl` (spike B0 #7: synthetic link clicks do a full load).
+- `MapUrlTracker` (bubble B2a) is not written yet. The host reports `doUpdateVisitedHistory`,
+  `onPageStarted` (null) and `onPageFinished` straight to `mapState.reportUrl`; the 1 s poll is open.
+- A recreation reloads `mapState.url`; if the recreation happened mid-load (url null), the
+  start/intent URL is loaded instead.
+- `MapScreen` gets `MapStateRepository` and `MapCommands` from the Activity (field injection)
+  rather than through a ViewModel; no feature ViewModel exists yet.
+- `MapCommand.OpenGmapsMenu` only logs until custom search S1 settles the burger selector.
+- androidx.webkit calls are wrapped: a feature can be reported as supported and still throw
+  `UnsupportedOperationException` (seen under Robolectric for algorithmic darkening).
+

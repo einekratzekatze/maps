@@ -12,7 +12,4 @@ import javax.inject.Inject
 @HiltViewModel
 class WebSessionViewModel @Inject constructor() : ViewModel() {
     var started = false
-
-    /** The page to reload after a recreation. 1.3b replaces this with `MapStateRepository.url`. */
-    var lastUrl: String? = null
 }

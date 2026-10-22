@@ -36,16 +36,23 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import dagger.hilt.android.AndroidEntryPoint
+import io.github.einekratzekatze.maps.map.MapCommands
+import io.github.einekratzekatze.maps.map.MapStateRepository
+import io.github.einekratzekatze.maps.map.PageScript
 import io.github.einekratzekatze.maps.map.WebSessionViewModel
 import io.github.einekratzekatze.maps.map.WebViewHost
 import io.github.einekratzekatze.maps.ui.AppRoot
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
+import javax.inject.Inject
 
 /** Lifecycle glue only; the WebView lives in [WebViewHost] (compose-host.md §1, §2). */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    @Inject lateinit var mapState: MapStateRepository
+    @Inject lateinit var commands: MapCommands
+    @Inject lateinit var pageScripts: Set<@JvmSuppressWildcards PageScript>
     private lateinit var host: WebViewHost
     private val session: WebSessionViewModel by viewModels()
     private var locationManager: LocationManager? = null
@@ -84,7 +91,7 @@ class MainActivity : ComponentActivity() {
         // A configuration-change recreation keeps cookies and reloads the last page (§2.3).
         val recreated = session.started
         session.started = true
-        host = WebViewHost(this, freshLaunch = !recreated) { session.lastUrl = it }
+        host = WebViewHost(this, freshLaunch = !recreated, mapState, pageScripts)
 
         initShareLinkListener()
 
@@ -98,9 +105,10 @@ class MainActivity : ComponentActivity() {
 
         if (BuildConfig.DEBUG) startSpikeInstrumentation()
 
-        setContent { AppRoot(host) }
+        setContent { AppRoot(host, mapState, commands) }
 
-        host.loadUrl(session.lastUrl.takeIf { recreated } ?: urlFromIntent())
+        // mapState.url is null when the recreation happened mid-load; the start URL is the fallback.
+        host.loadUrl(mapState.url.value.takeIf { recreated } ?: urlFromIntent())
     }
 
     override fun onDestroy() {

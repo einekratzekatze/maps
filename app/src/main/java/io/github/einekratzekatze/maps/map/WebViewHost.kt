@@ -39,7 +39,10 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.net.toUri
+import androidx.webkit.JavaScriptReplyProxy
+import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import io.github.einekratzekatze.maps.BuildConfig
 import io.github.einekratzekatze.maps.MainActivity
@@ -49,25 +52,32 @@ import io.github.einekratzekatze.maps.navigation.StartDeduper
 import io.github.einekratzekatze.maps.navigation.StartOrigin
 import io.github.einekratzekatze.maps.navigation.StartPress
 import io.github.einekratzekatze.maps.navigation.StartTargetParser
+import org.json.JSONException
+import org.json.JSONObject
 
 /**
  * The single owner of the WebView (compose-host.md §3). Activity-scoped: created in `onCreate`,
  * destroyed in `onDestroy`. Not injected into ViewModels. Only this class touches the WebView,
- * its settings and its clients.
+ * its settings, its clients, the touch listener and the page-script bridge.
  */
 class WebViewHost(
     private val activity: ComponentActivity,
     freshLaunch: Boolean,
-    private val onUrl: (String) -> Unit,
-) {
+    private val mapState: MapStateRepository,
+    private val pageScripts: Set<PageScript>,
+) : MapController {
     val webView: WebView = WebView(activity)
     private val settings: WebSettings = webView.settings
     private val startDeduper = StartDeduper(now = SystemClock::elapsedRealtime)
     private var locationRequestCount = 0
+    /** Reply channel of the main frame's GmwBridge, set by its first message (§4.3). */
+    private var bridgeReply: JavaScriptReplyProxy? = null
 
     companion object {
         private const val TAG = "GMapsWV"
         private const val SPIKE_TAG = "SPIKE"
+        private const val BRIDGE = "GmwBridge"
+        private val bridgeOrigins = setOf("https://www.google.com", "https://maps.google.com")
         private const val USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36"
 
@@ -152,27 +162,81 @@ class WebViewHost(
             saveFormData = false
             userAgentString = USER_AGENT
         }
+        @SuppressLint("ClickableViewAccessibility") // observe only, see WebViewTouchObserver
+        webView.setOnTouchListener(WebViewTouchObserver(webView, mapState::reportTouch))
+        webView.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            mapState.reportViewportSize(v.width, v.height, v.resources.displayMetrics.density)
+        }
+        installPageScripts()
     }
 
-    fun loadUrl(url: String) = webView.loadUrl(url)
+    override fun loadUrl(url: String) = webView.loadUrl(url)
+
+    override fun navigateInPage(url: String) = loadUrl(url)
+
+    override fun evaluateJs(script: String, callback: ((String?) -> Unit)?) {
+        webView.evaluateJavascript(script, callback?.let { cb -> { result: String? -> cb(result) } })
+    }
+
+    override fun postMessage(json: String) {
+        val reply = bridgeReply
+        if (reply != null && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            reply.postMessage(json)
+        } else {
+            Log.w(TAG, "postMessage before the page opened $BRIDGE, dropped")
+        }
+    }
+
+    override fun canGoBack(): Boolean = webView.canGoBack() && webView.url != "about:blank"
+
+    override fun goBack() = webView.goBack()
 
     /** History-back, or false when there is nothing to go back to (the caller then finishes). */
     fun goBackInHistory(): Boolean {
-        if (webView.canGoBack() && webView.url != "about:blank") {
-            webView.goBack()
-            return true
+        if (!canGoBack()) return false
+        goBack()
+        return true
+    }
+
+    private fun installPageScripts() {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            for (script in pageScripts) {
+                webkitCall("addDocumentStartJavaScript(${script.id})") {
+                    WebViewCompat.addDocumentStartJavaScript(webView, script.source(activity), script.allowedOrigins)
+                }
+            }
         }
-        return false
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return
+        val origins = bridgeOrigins + pageScripts.flatMap { it.allowedOrigins }
+        webkitCall("addWebMessageListener") {
+            WebViewCompat.addWebMessageListener(webView, BRIDGE, origins) { _, message, _, isMainFrame, reply ->
+                if (!isMainFrame) return@addWebMessageListener
+                bridgeReply = reply
+                parsePageMessage(message)?.let(mapState::reportPageMessage)
+            }
+        }
+    }
+
+    /** Fallback when document-start scripts are not supported: run them as early as we can. */
+    private fun evaluatePageScripts() {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
+        for (script in pageScripts) webView.evaluateJavascript(script.source(activity), null)
+    }
+
+    /** androidx.webkit can report a feature that the installed WebView APK then rejects (also under Robolectric). */
+    private inline fun webkitCall(what: String, block: () -> Unit) {
+        try {
+            block()
+        } catch (e: UnsupportedOperationException) {
+            Log.w(TAG, "$what not supported by this WebView", e)
+        }
     }
 
     fun updateDarkening(config: Configuration) {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING) && Build.VERSION.SDK_INT >= 29) {
             val nightMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-            try {
+            webkitCall("setAlgorithmicDarkeningAllowed") {
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, nightMode)
-            } catch (e: UnsupportedOperationException) {
-                // The feature check and the installed WebView APK can disagree (also under Robolectric).
-                Log.w(TAG, "Algorithmic darkening not supported", e)
             }
         }
     }
@@ -194,6 +258,7 @@ class WebViewHost(
             removeAllViews()
             destroy()
         }
+        bridgeReply = null
         settings.javaScriptEnabled = false
         if (wipe) wipeSessionData()
     }
@@ -257,12 +322,16 @@ class WebViewHost(
         override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
             super.doUpdateVisitedHistory(view, url, isReload)
             if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "history reload=$isReload url=$url")
-            onUrl(url)
+            mapState.reportUrl(url)
         }
 
         override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
             super.onPageStarted(view, url, favicon)
             if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "pageStarted url=$url")
+            // A full load is starting: the old camera is stale (floating-places-bubble.md §5.1).
+            bridgeReply = null
+            mapState.reportUrl(null)
+            evaluatePageScripts()
         }
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -328,7 +397,7 @@ class WebViewHost(
         override fun onPageFinished(view: WebView, url: String) {
             super.onPageFinished(view, url)
             if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "pageFinished url=$url")
-            onUrl(url)
+            mapState.reportUrl(url)
             view.evaluateJavascript("""
                 var head = document.getElementsByTagName('head');
                 if (head.length > 0) {
@@ -339,5 +408,19 @@ class WebViewHost(
                 }
             """.trimIndent(), null)
         }
+    }
+}
+
+/** A string message `{"type": "...", ...}` -> [PageMessage]; anything else is dropped. */
+internal fun parsePageMessage(message: WebMessageCompat): PageMessage? =
+    if (message.type == WebMessageCompat.TYPE_STRING) parsePageMessage(message.data) else null
+
+internal fun parsePageMessage(data: String?): PageMessage? {
+    if (data == null) return null
+    return try {
+        val type = JSONObject(data).optString("type")
+        if (type.isEmpty()) null else PageMessage(type, data)
+    } catch (_: JSONException) {
+        null
     }
 }

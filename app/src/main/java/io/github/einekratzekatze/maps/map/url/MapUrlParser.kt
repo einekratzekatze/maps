@@ -75,7 +75,7 @@ object MapUrlParser {
 
     private fun decode(s: String): String =
         try {
-            URLDecoder.decode(s, Charsets.UTF_8)
+            URLDecoder.decode(s, "UTF-8") // the Charset overload needs API 33
         } catch (_: IllegalArgumentException) {
             s.replace('+', ' ')
         }
