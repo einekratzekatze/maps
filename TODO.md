@@ -20,15 +20,15 @@ visual judgement (previews, animation feel).
 These are short human sessions with a debug build. Each one blocks the work listed after
 it; agents must not start that work before the spike's results are written into its spec.
 
-- [ ] **B0** (≤ 1 h) — URL/viewport behaviour of mobile GMaps: does `@lat,lng,zoomz` update
+- [ ] **B0** (partly done 2026-10-22, see `docs/design/spike-results.md`; open: real URLs per suffix and non-map URLs) (≤ 1 h) — URL/viewport behaviour of mobile GMaps: does `@lat,lng,zoomz` update
   on pan, latency, does `doUpdateVisitedHistory` fire, real URLs per suffix, CSS viewport,
   in-page navigation via synthetic link click, non-map URLs.
   Spec: `floating-places-bubble.md` §0.1. Blocks: bubble B1+, markers M1+, search viewport bias.
 - [ ] **N0** (≤ 1 h) — capture Start/Directions intent fixtures, chooser-cancel lifecycle.
   Spec: `nav-handoff.md` §4.0. Blocks: N1, N2, N5.
-- [ ] **M0** (≤ 1 h; latency taken from B0) — does `google.maps.Map` exist? Picks Renderer P or J.
+- [x] **M0** — done 2026-10-22: `window.google` undefined, so Renderer P (see `docs/design/spike-results.md`).
   Spec: `map-markers-js.md` §0. Blocks: M1–M7.
-- [ ] **S0** (≤ 2 h) — GMaps search DOM in English and German, `selectors.json`, search URL form.
+- [ ] **S0** (partly done 2026-10-22, see `docs/design/spike-results.md`; open: search URL form, selectors.json) (≤ 2 h) — GMaps search DOM in English and German, `selectors.json`, search URL form.
   Spec: `custom-search-field.md` §5. Blocks: S7, S8.
 
 ---
