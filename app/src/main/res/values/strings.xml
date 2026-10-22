@@ -76,4 +76,8 @@
     <string name="search_section_google">Google</string>
     <string name="search_google_unavailable">Google suggestions unavailable</string>
     <string name="search_delete_recent">Remove %s from recent searches</string>
+    <!-- External lists (Google My Maps) -->
+    <string name="external_list_unnamed">My Maps list</string>
+    <string name="external_sublist_unnamed">Untitled layer</string>
+    <string name="external_place_unnamed">Untitled place</string>
 </resources>

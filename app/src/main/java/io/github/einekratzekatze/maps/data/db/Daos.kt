@@ -164,3 +164,51 @@ interface RecentSearchDao {
 
     @Query("DELETE FROM RecentSearch WHERE id = :id") suspend fun delete(id: Long)
 }
+
+/** One sublist of a refreshed external list; [places] get their listId/externalSublistId set by [ExternalListDao.replaceContent]. */
+data class ExternalSublistContent(val name: String, val places: List<Place>)
+
+@Dao
+interface ExternalListDao {
+    @Insert suspend fun insertExternal(row: ExternalList): Long
+    @Query("SELECT * FROM ExternalList WHERE listId = :listId") suspend fun getByList(listId: Long): ExternalList?
+    @Query("SELECT * FROM ExternalList WHERE mapId = :mapId") suspend fun getByMapId(mapId: String): ExternalList?
+    @Query("SELECT * FROM ExternalList ORDER BY id") suspend fun getAll(): List<ExternalList>
+
+    @Query("SELECT * FROM ExternalSublist WHERE externalListId = :id ORDER BY sortOrder, id")
+    fun observeSublists(id: Long): Flow<List<ExternalSublist>>
+    @Query("SELECT * FROM ExternalSublist WHERE externalListId = :id ORDER BY sortOrder, id")
+    suspend fun getSublists(id: Long): List<ExternalSublist>
+    @Query("UPDATE ExternalSublist SET visible = :visible WHERE id = :id")
+    suspend fun setSublistVisible(id: Long, visible: Boolean)
+    /** Drives the "Remove this list?" prompt (TODO 5.2). */
+    @Query("SELECT NOT EXISTS(SELECT 1 FROM ExternalSublist WHERE externalListId = :id AND visible = 1)")
+    fun observeAllHidden(id: Long): Flow<Boolean>
+
+    @Query("DELETE FROM Place WHERE listId = :listId") suspend fun deletePlacesOfList(listId: Long)
+    @Query("DELETE FROM ExternalSublist WHERE externalListId = :id") suspend fun deleteSublists(id: Long)
+    @Insert suspend fun insertSublist(row: ExternalSublist): Long
+    @Insert suspend fun insertPlaces(rows: List<Place>)
+    @Query("UPDATE ExternalList SET lastFetchedAt = :now, rawKml = :rawKml WHERE id = :id")
+    suspend fun setFetched(id: Long, rawKml: String?, now: Long)
+
+    /**
+     * Refresh: replaces all sublists and places of one external list atomically (schema.md §2.6).
+     * Sublist visibility is carried over by name (the first sublist of a name wins). Place ids
+     * change on refresh.
+     */
+    @Transaction
+    suspend fun replaceContent(externalListId: Long, listId: Long, content: List<ExternalSublistContent>, rawKml: String?, now: Long) {
+        val visibleByName = getSublists(externalListId).reversed().associate { it.name to it.visible }
+        deletePlacesOfList(listId)
+        deleteSublists(externalListId)
+        content.forEachIndexed { index, sub ->
+            val sublistId = insertSublist(
+                ExternalSublist(externalListId = externalListId, name = sub.name, visible = visibleByName[sub.name] ?: true, sortOrder = index),
+            )
+            insertPlaces(sub.places.map { it.copy(id = 0, listId = listId, externalSublistId = sublistId) })
+        }
+        setFetched(externalListId, rawKml, now)
+    }
+}
+

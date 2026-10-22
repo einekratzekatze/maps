@@ -15,6 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.einekratzekatze.maps.data.db.AppDatabase
 import io.github.einekratzekatze.maps.data.db.DriveDao
+import io.github.einekratzekatze.maps.data.db.ExternalListDao
 import io.github.einekratzekatze.maps.data.db.ImportantLocationDao
 import io.github.einekratzekatze.maps.data.db.PlaceDao
 import io.github.einekratzekatze.maps.data.db.PlaceListDao
@@ -25,6 +26,10 @@ import io.github.einekratzekatze.maps.data.repo.PlacesQueries
 import io.github.einekratzekatze.maps.data.repo.PlacesRepository
 import io.github.einekratzekatze.maps.data.repo.RecentSearchRepository
 import io.github.einekratzekatze.maps.data.repo.RecentSearches
+import io.github.einekratzekatze.maps.data.repo.ExternalListLabels
+import io.github.einekratzekatze.maps.data.mymaps.HttpKmlFetcher
+import io.github.einekratzekatze.maps.data.mymaps.KmlFetcher
+import io.github.einekratzekatze.maps.R
 import io.github.einekratzekatze.maps.data.prefs.BubblePrefs
 import io.github.einekratzekatze.maps.data.prefs.DataStoreBubblePrefs
 import io.github.einekratzekatze.maps.data.prefs.DataStoreSearchPrefs
@@ -44,6 +49,12 @@ object DatabaseModule {
     @Provides @Singleton fun drivesListIdStore(impl: DataStoreDrivesListIdStore): DrivesListIdStore = impl
     @Provides fun placesQueries(impl: PlacesRepository): PlacesQueries = impl
     @Provides fun recentSearches(impl: RecentSearchRepository): RecentSearches = impl
+    @Provides fun kmlFetcher(impl: HttpKmlFetcher): KmlFetcher = impl
+    @Provides fun externalListLabels(@ApplicationContext context: Context) = ExternalListLabels(
+        list = context.getString(R.string.external_list_unnamed),
+        sublist = context.getString(R.string.external_sublist_unnamed),
+        place = context.getString(R.string.external_place_unnamed),
+    )
     @Provides fun bubblePrefs(impl: DataStoreBubblePrefs): BubblePrefs = impl
     @Provides fun searchPrefs(impl: DataStoreSearchPrefs): SearchPrefs = impl
     @Provides fun autocompleteClient(impl: PlacesAutocompleteClient): AutocompleteClient = impl
@@ -61,4 +72,5 @@ object DatabaseModule {
     @Provides fun placeListDao(db: AppDatabase): PlaceListDao = db.placeListDao()
     @Provides fun driveDao(db: AppDatabase): DriveDao = db.driveDao()
     @Provides fun recentSearchDao(db: AppDatabase): RecentSearchDao = db.recentSearchDao()
+    @Provides fun externalListDao(db: AppDatabase): ExternalListDao = db.externalListDao()
 }

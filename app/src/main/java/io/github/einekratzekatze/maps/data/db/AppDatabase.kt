@@ -20,6 +20,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun placeListDao(): PlaceListDao
     abstract fun driveDao(): DriveDao
     abstract fun recentSearchDao(): RecentSearchDao
+    abstract fun externalListDao(): ExternalListDao
 
     /** Seeds Home (id 1) and Work (id 2) once, when the file is created (schema.md 1.8). */
     object SeedCallback : Callback() {
