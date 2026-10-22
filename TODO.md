@@ -594,12 +594,23 @@ Hide our search field (show map-only top bar) when GMaps is in a mode that owns 
   clash with WebView resize behaviour (`adjustResize` vs `adjustPan`). Test on device.
 - [x] **Directions mode** — our search field is replaced by a back/close title and the bubble
   is hidden (default chosen 2026-10-21, owner may veto; `compose-host.md` §7.3)
-- [ ] **Search URL format** — verify which produces better WebView results:
+- [x] **Search URL format** (spike S0: all forms land on `/maps/search/<q>/@…`; use that) — verify which produces better WebView results:
   `https://www.google.com/maps/search/<query>` vs `https://www.google.com/maps?q=<query>`
 - [ ] **Voice search** — replacing the native field loses the mic button. Adding our own
   requires `RECORD_AUDIO` permission + `SpeechRecognizer` intent. Decide if in scope.
 - [ ] **Takeout import for recent searches** — Google Takeout includes search history
   (`My Activity/Maps/`). Worth importing for pre-populating recents on first run?
+
+---
+
+## Post-release experiments (not scheduled; do not start before the first release)
+
+- [ ] **Desktop map in the WebView** `[needs device]` — the phone page is the "lite" map: no tilt,
+  no rotate (spike B0 #8). Try a desktop user agent and a desktop viewport to get the full map
+  (tilt/rotate, 3D). Expect: heavy page, no phone layout, different DOM and URL shapes
+  (`m`/`a`/`t`/`h`/`y` camera suffixes), and every JS selector, the Start/Directions
+  detection (spike N0) and the bubble's viewport parsing need re-verifying. Make it an opt-in
+  setting, never the default; keep the lite map as the fallback.
 
 ---
 
