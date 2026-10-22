@@ -5,7 +5,7 @@ driven over adb (`input swipe/tap`, `logcat -s SPIKE`) and Chrome DevTools over
 `adb forward ... localabstract:webview_devtools_remote_<pid>` (JS probes). Coordinates in the
 captured URLs are Google's default Berlin viewport, not the owner's location.
 
-Status: **M0 done. B0, S0 and N0 partly done.**
+Status: **M0 and S0 (URL form) done. B0 (suffixes) done for what the page offers. N0 partly done.**
 
 ## B0 — URL and viewport behaviour
 
@@ -18,7 +18,7 @@ Status: **M0 done. B0, S0 and N0 partly done.**
 | 5 | CSS viewport | `innerWidth × innerHeight = 411 × 844`, `devicePixelRatio = 2.625` (WebView area under the status bar, no top bar yet). |
 | 6 | URL shape | `https://www.google.com/maps/@52.5204675,13.3292937,12z?g_ep=...` (an extra `g_ep` param after the camera). `?hl=de` is kept in the query. Search URL after navigation: `/maps/search/<q>/@lat,lng,17z?g_ep=...`. |
 | 7 | In-page navigation by synthetic link click | **Does not work as SPA navigation**: a clicked `<a href="/maps/...">` caused a full page navigation (`shouldOverrideUrlLoading` + `onPageStarted`, JS globals lost). Bubble rows must use `loadUrl` (about 0.6 s to `onPageFinished`); the "in-page first" default in the bubble spec reduces to the fallback. |
-| 8 | Real URLs per suffix (`z`, `m`, `a`, `y`, `t`, `h`), non-map URLs | **Not captured.** Needs the owner to tilt, rotate, switch to satellite/3D and open a place photo, side menu, and consent page. |
+| 8 | Real URLs per suffix (`z`, `m`, `a`, `y`, `t`, `h`), non-map URLs | **Only `z` exists.** The mobile web map is the "lite" renderer (`window.mapslite`): synthetic two-finger rotate changed nothing, a two-finger vertical drag was just a pan, and the burger menu's "Map movement controls" only adds pan arrows, zoom +/- and a recenter button (no tilt/rotate). **Satellite** (menu > Satellite) keeps `@lat,lng,16z` and appends `/data=!3m1!1e3`. So no `m`/`a`/`t`/`h`/`y` handling is needed for this page; keep the parser tolerant of them anyway. Place photo, consent page URLs: not captured. |
 | 9 | Load-time redirect | At page load GMaps asks for an app hand-off: `intent://www.google.com/maps?entry=ml&utm_campaign=ml-ardi&coh=...#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=...;end` (blocked by the existing non-https rule; harmless, but classify it as `NonMap`/ignore in the Dynamic Link classifier). |
 
 **Consequences for the specs**
@@ -39,7 +39,9 @@ Status: **M0 done. B0, S0 and N0 partly done.**
 - `aria-label`s are fully localised: en `Menu`, `Clear`, `Sign in`, `Back`, `Close`, `Re-center map to your location`, `Expand quick actions`; de `Menü`, `Löschen`, `Anmelden`, `Zurück`, `Schließen`, `Deinen Standort wieder auf der Karte zentrieren`, `Schnellaktionen maximieren`. Menu is the first `BUTTON` in the pill in both languages: prefer a structural selector (e.g. `.bVzuaf button:first-of-type`, **untested guess**, verify in S1) with a locale-independent fallback and keep the German/English label table.
 - `?hl=de` switches the UI language (`<html lang>` becomes `de`); `navigator.language` stays `en-DE`.
 - Hiding the pill with CSS is feasible via `.bVzuaf` but the class name is minified and will drift: keep the spec's fallback (leave GMaps' field visible when the selector does not match).
-- **Not yet done:** search URL form comparison (`/maps/search/<q>` vs `/maps?q=`), `selectors.json` capture, behaviour of the directions screen search fields.
+- **Search URL forms (done):** `/maps/search/<q>`, `/maps?q=<q>` and `/maps/search/?api=1&query=<q>` all end on `https://www.google.com/maps/search/<q>/@lat,lng,<z>z?g_ep=...`. Use `/maps/search/<q>` (the zoom differs slightly: 17z vs 16z for the api form). Page loads in about 9 s under adb polling.
+- **Menu (burger) entries,** useful for later: Traffic, Transit, Bicycling, Satellite, Terrain, Wildfires, Air Quality, Map movement controls, Real-time location sharing, Your contributions, Your places, Settings, Language, My Maps. Localised labels; the pill's first button opens it.
+- **Not yet done:** `selectors.json` capture (stable selector set per locale), behaviour of the directions screen search fields.
 
 ## N0 — Start/Directions intent fixtures
 
