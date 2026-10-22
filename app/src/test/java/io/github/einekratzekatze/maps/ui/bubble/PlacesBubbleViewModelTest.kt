@@ -55,6 +55,11 @@ class FakePlacesQueries : PlacesQueries {
     override fun observeImportant() = important
     override fun observeImportantInBounds(bounds: GeoBounds) =
         important.map { l -> l.filter { LatLon.ofOrNull(it.lat, it.lon)?.let(bounds::contains) == true } }
+    var searchCalls = 0
+    override suspend fun search(query: String, center: LatLon?, limit: Int): List<NearbyPlaceRow> {
+        searchCalls++
+        return rows.value.filter { it.nameNormalized.contains(query.lowercase()) }.take(limit)
+    }
 }
 
 class FakeBubblePrefs : BubblePrefs {

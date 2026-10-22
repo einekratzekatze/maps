@@ -23,6 +23,8 @@ import io.github.einekratzekatze.maps.data.repo.DataStoreDrivesListIdStore
 import io.github.einekratzekatze.maps.data.repo.DrivesListIdStore
 import io.github.einekratzekatze.maps.data.repo.PlacesQueries
 import io.github.einekratzekatze.maps.data.repo.PlacesRepository
+import io.github.einekratzekatze.maps.data.repo.RecentSearchRepository
+import io.github.einekratzekatze.maps.data.repo.RecentSearches
 import io.github.einekratzekatze.maps.data.prefs.BubblePrefs
 import io.github.einekratzekatze.maps.data.prefs.DataStoreBubblePrefs
 import io.github.einekratzekatze.maps.data.prefs.DataStoreSearchPrefs
@@ -41,6 +43,7 @@ object DatabaseModule {
 
     @Provides @Singleton fun drivesListIdStore(impl: DataStoreDrivesListIdStore): DrivesListIdStore = impl
     @Provides fun placesQueries(impl: PlacesRepository): PlacesQueries = impl
+    @Provides fun recentSearches(impl: RecentSearchRepository): RecentSearches = impl
     @Provides fun bubblePrefs(impl: DataStoreBubblePrefs): BubblePrefs = impl
     @Provides fun searchPrefs(impl: DataStoreSearchPrefs): SearchPrefs = impl
     @Provides fun autocompleteClient(impl: PlacesAutocompleteClient): AutocompleteClient = impl

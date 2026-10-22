@@ -57,7 +57,7 @@ class PlacesRepository @Inject constructor(
         important.observeInBounds(bounds.south, bounds.west, bounds.north, bounds.east)
 
     /** A blank query returns no places (suggestions need input; recents cover the empty field). */
-    suspend fun search(query: String, center: LatLon?, limit: Int): List<NearbyPlaceRow> {
+    override suspend fun search(query: String, center: LatLon?, limit: Int): List<NearbyPlaceRow> {
         require(limit > 0) { "limit must be positive" }
         val n = TextNormalizer.normalize(query)
         if (n.isEmpty()) return emptyList()

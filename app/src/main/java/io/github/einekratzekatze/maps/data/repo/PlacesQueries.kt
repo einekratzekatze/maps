@@ -14,4 +14,6 @@ interface PlacesQueries {
     fun observeDetail(id: Long): Flow<PlaceDetailRow?>
     fun observeImportant(): Flow<List<ImportantLocation>>
     fun observeImportantInBounds(bounds: GeoBounds): Flow<List<ImportantLocation>>
+    /** Name/address matches, prefix matches first, then nearest to [center]. Blank returns nothing. */
+    suspend fun search(query: String, center: LatLon?, limit: Int): List<NearbyPlaceRow>
 }
