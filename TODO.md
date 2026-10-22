@@ -96,6 +96,9 @@ in `docs/design/REVIEW.md` §5; specs do not pin them.
 ### 1.1 Top bar
 
 **Verification:** `[needs device]`
+> 2026-10-22: `ui/search/MapTopBar.kt` exists (menu + search field / Directions title, Compose-tested)
+> but is **not on the map screen yet**: it goes in together with search S7 (hide GMaps' pill), else
+> there are two search fields. See `docs/HANDOFF.md`.
 - [ ] Add a `TopAppBar` above the WebView (replace `FEATURE_NO_TITLE`)
 - [ ] Slots: app icon/title (left), settings icon (right)
 - [ ] Settings icon opens settings screen (Phase 7)
@@ -107,17 +110,20 @@ below where they differ — e.g. no `Popup`, card ≤ 50 % height on phones, hid
 Directions mode, badge counts distinct places).
 
 **Verification:** `[unit-testable]` + `[needs device]` per task
-- [ ] Add a draggable `FloatingActionButton` (or custom `View`) anchored to screen edge
+> 2026-10-22: code for B1, B2a, B2b (debug crosshair), B4, B5, B6, B6p, B7, B8a, B8b and the bubble
+> part of B9 is done and on the map screen; the JVM/Compose tests of spec §9.1-9.2 (T-C1-T-C15) pass.
+> Open: device checks D1-D27, B2b calibration, B9 focus handoff to the card title, B10.
+- [x] Add a draggable `FloatingActionButton` (or custom `View`) anchored to screen edge
   - Sits above WebView, detached from map coordinates
   - Shows badge count of saved places in current viewport
-- [ ] Tap → expands into a hovering card
+- [x] Tap → expands into a hovering card
   - Card floats above the WebView
   - Top bar inside the card: title ("Nearby" / place name) + **X button** to close
   - The X or tapping outside closes it
   - Contents: Home/Work shortcuts (always at top), then nearby saved places
     (filtered by current viewport, see Phase 3.2)
   - Each place row: name, list colour chip, "Navigate" button
-- [ ] Implement in Compose as a `Popup` or elevated `Card`; host in a `Box` with the WebView
+- [x] Implement in Compose as a `Popup` or elevated `Card`; host in a `Box` with the WebView (elevated card, no Popup)
 
 ### 1.3 Wrap WebView in Compose
 
@@ -201,22 +207,22 @@ enums stored by name). Do not take entity fields from this file or from the feat
 - [x] DB2: `PlaceDao` (incl. ordered, capped `observeInBounds`, `search`) + `ImportantLocationDao` + `PlacesRepository`
 - [x] DB3: `PlaceListDao`, `DriveDao` + repositories
 - [x] DB4: `RecentSearchDao` + repository (see 8.3)
-- [ ] DB5: `ExternalListDao.replaceContent` (with Phase 5.1)
+- [x] DB5: `ExternalListDao.replaceContent` (with Phase 5.1)
 
 ### 3.2 Viewport-based filtering
 
 **Spec:** `docs/design/floating-places-bubble.md` §5 (tasks B0, B1, B2a/B2b, B4).
 
 **Verification:** `[unit-testable]` (pure logic) + `[needs device]` (WebView/UI wiring)
-- [ ] Track current map viewport by parsing `@lat,lng,zoomz` from URL updates
+- [x] Track current map viewport by parsing `@lat,lng,zoomz` from URL updates (`MapUrlTracker`)
   - **Not** `shouldOverrideUrlLoading`: it does not fire for `history.replaceState`, which is
     how GMaps updates the camera (superseded)
   - Primary hook: `WebViewClient.doUpdateVisitedHistory`; `onPageStarted` reports "unknown";
     `onPageFinished` reports the URL; 1 s poll of `webView.url` as fallback only (delete if
     spike B0 shows `doUpdateVisitedHistory` covers every case)
-- [ ] Implement Web Mercator bounding box calculation from center + zoom + screen size
-- [ ] Query `PlaceDao.observeInBounds` (schema.md: nearest-first `ORDER BY`, capped at 501)
-- [ ] Expose result as `StateFlow` in ViewModel → drives bubble badge count
+- [x] Implement Web Mercator bounding box calculation from center + zoom + screen size
+- [x] Query `PlaceDao.observeInBounds` (schema.md: nearest-first `ORDER BY`, capped at 501) (`NearbyPlacesSource`)
+- [x] Expose result as `StateFlow` in ViewModel → drives bubble badge count
 
 ### 3.3 List management UI
 
@@ -287,14 +293,16 @@ Moved here from Phase 2 — this is a data/list feature, not part of the nav han
 ### 5.1 KML fetch and parse
 
 **Verification:** `[unit-testable]`
-- [ ] Fetch KML from `https://www.google.com/maps/d/kml?mid=<map_id>` (public maps only)
+> 2026-10-22: `ExternalListRepository.import/refresh` + `ExternalListRefreshWorker` done and tested.
+> No import UI yet (comes with the lists screens, 3.3).
+- [x] Fetch KML from `https://www.google.com/maps/d/kml?mid=<map_id>` (public maps only)
   - Extract `mid` from user-pasted `google.com/maps/d/u/0/...` URL
-- [ ] Parse with `XmlPullParser`:
+- [x] Parse with `XmlPullParser`:
   - `<Document><name>` → list name
   - `<Folder><name>` → sublist name
   - `<Placemark>` within folder → place (name + coordinates)
-- [ ] Store parsed data into `ExternalList`, `ExternalSublist`, `Place` rows in Room
-- [ ] Run fetch in `WorkManager` `CoroutineWorker` (one-time on import, periodic on refresh)
+- [x] Store parsed data into `ExternalList`, `ExternalSublist`, `Place` rows in Room
+- [x] Run fetch in `WorkManager` `CoroutineWorker` (one-time on import, periodic on refresh)
 
 ### 5.2 Sublist toggle behaviour
 
@@ -493,6 +501,8 @@ Used if Strategy 1 breaks layout or the panel stops opening correctly.
 ### 8.2 Top bar search field (Compose)
 
 **Verification:** `[needs device]`
+> 2026-10-22: S4 (Places autocomplete client + key pref), S5 (`SearchViewModel`) and S6 (top bar,
+> suggestion panel) done with tests; not on the map screen until S7. Open: S7-S10 (device).
 - [ ] Replace static top bar title with an always-visible search `TextField` in the `TopAppBar`
 - [ ] On focus: show suggestion dropdown (saved places + recent searches matching input)
 - [ ] On submit: construct search URL and call `mapsWebView.loadUrl()`
@@ -508,11 +518,11 @@ Used if Strategy 1 breaks layout or the panel stops opening correctly.
 `RecentSearchDao`); behaviour in `custom-search-field.md` §4.
 
 **Verification:** `[unit-testable]` (Robolectric)
-- [ ] **Saved places**: `PlaceDao.search` on `nameNormalized`/`addressNormalized` (accent- and
+- [x] **Saved places**: `PlaceDao.search` on `nameNormalized`/`addressNormalized` (accent- and
   case-insensitive, `LIKE … ESCAPE`), prefix matches first, show with list colour chip
 - [ ] **Recent searches**: `RecentSearch` entity — `id`, `query`, `queryNormalized` (unique),
   `timestamp`; show most recent first, capped at 20 entries; delete individual entries with swipe
-- [ ] Store new search in `RecentSearch` on every submit
+- [x] Store new search in `RecentSearch` on every submit
 
 ### 8.4 Visibility state machine
 

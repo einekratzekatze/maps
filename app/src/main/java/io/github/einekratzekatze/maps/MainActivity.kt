@@ -35,7 +35,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import io.github.einekratzekatze.maps.data.DebugSeeder
 import io.github.einekratzekatze.maps.map.MapCommands
 import io.github.einekratzekatze.maps.map.MapStateRepository
 import io.github.einekratzekatze.maps.map.PageScript
@@ -45,6 +47,7 @@ import io.github.einekratzekatze.maps.ui.AppRoot
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 /** Lifecycle glue only; the WebView lives in [WebViewHost] (compose-host.md §1, §2). */
 @AndroidEntryPoint
@@ -53,6 +56,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var mapState: MapStateRepository
     @Inject lateinit var commands: MapCommands
     @Inject lateinit var pageScripts: Set<@JvmSuppressWildcards PageScript>
+    @Inject lateinit var debugSeeder: DebugSeeder
     private lateinit var host: WebViewHost
     private val session: WebSessionViewModel by viewModels()
     private var locationManager: LocationManager? = null
@@ -104,6 +108,10 @@ class MainActivity : ComponentActivity() {
         })
 
         if (BuildConfig.DEBUG) startSpikeInstrumentation()
+        if (BuildConfig.DEBUG && !recreated && intent.getBooleanExtra(DebugSeeder.EXTRA_SEED, false)) {
+            val at = DebugSeeder.parseAt(intent.getStringExtra(DebugSeeder.EXTRA_AT))
+            lifecycleScope.launch { debugSeeder.seed(at) }
+        }
 
         setContent { AppRoot(host, mapState, commands) }
 
