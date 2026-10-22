@@ -36,4 +36,12 @@ class StartPressTest {
         assertTrue(StartPress.isStart("https://maps.app.goo.gl/?link=x", route))
         assertTrue(StartPress.isStart("intent://maps.app.goo.gl/?link=x", route))
     }
+
+    @Test fun myLocationRouteIsAStartButTheChooseStartScreenIsNot() {
+        val press = "https://maps.app.goo.gl/?link=x"
+        val myLocation = "https://www.google.com/maps/dir//Government+District,+Mitte,+Berlin/@52.5,13.3,13z/data=!4m7!4m6!1m1!4e2!1m2!1m1!1s0x1:0x2!3e0?utm_campaign=x"
+        val chooseStart = "https://www.google.com/maps/dir//Government+District,+Mitte,+Berlin/@52.5,13.3,13z/data=!4m5!4m4!1m0!1m2!1m1!1s0x1:0x2"
+        assertTrue(StartPress.isStart(press, myLocation))
+        assertFalse(StartPress.isStart(press, chooseStart))
+    }
 }
