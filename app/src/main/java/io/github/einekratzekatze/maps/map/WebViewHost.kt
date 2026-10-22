@@ -19,6 +19,7 @@ package io.github.einekratzekatze.maps.map
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -99,11 +100,10 @@ class WebViewHost(
             "maps.google.com",
             "maps.gstatic.com",
             "ssl.gstatic.com",
-            "streetviewpixels-pa.googleapis.com",
             "www.google.com",
             "www.gstatic.com",
         )
-        private val allowedDomainsStart = setOf("consent.google.") // TODO: better cctld handling
+        private val allowedDomainsStart = setOf("consent.google.", "streetviewpixels") // TODO: better cctld handling (upstream #63: Street View host names vary)
         private val allowedDomainsEnd = setOf(".googleusercontent.com")
         private val blockedURLs = setOf(
             "analytics.google.com",
@@ -273,6 +273,15 @@ class WebViewHost(
 
     private fun block() = WebResourceResponse("text/javascript", "UTF-8", null)
 
+    /** Upstream #58: a missing handler (no dialer, no browser) must not crash the app. */
+    private fun startExternal(intent: Intent) {
+        try {
+            activity.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(activity, R.string.no_app_installed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private inner class ChromeClient : WebChromeClient() {
         override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
             if (activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -360,7 +369,7 @@ class WebViewHost(
             }
             if (url == "about:blank") return false
             if (url.startsWith("tel:")) {
-                activity.startActivity(Intent(Intent.ACTION_DIAL, request.url))
+                startExternal(Intent(Intent.ACTION_DIAL, request.url))
                 return true
             }
             if (!url.startsWith("https://")) {
@@ -374,7 +383,7 @@ class WebViewHost(
                         .setIcon(R.drawable.ic_warning)
                         .setMessage("${activity.getString(R.string.text_warning_link)}\n\n${activity.getString(R.string.text_open_link, url)}")
                         .setNegativeButton(android.R.string.cancel, null)
-                        .setPositiveButton(android.R.string.ok) { _, _ -> activity.startActivity(Intent(Intent.ACTION_VIEW, request.url)) }
+                        .setPositiveButton(android.R.string.ok) { _, _ -> startExternal(Intent(Intent.ACTION_VIEW, request.url)) }
                         .create()
                         .show()
                 }
@@ -390,7 +399,7 @@ class WebViewHost(
                     .setTitle(R.string.title_open_link)
                     .setMessage(activity.getString(R.string.text_open_link, url))
                     .setNegativeButton(android.R.string.cancel, null)
-                    .setPositiveButton(android.R.string.ok) { _, _ -> activity.startActivity(Intent(Intent.ACTION_VIEW, request.url)) }
+                    .setPositiveButton(android.R.string.ok) { _, _ -> startExternal(Intent(Intent.ACTION_VIEW, request.url)) }
                     .create()
                     .show()
                 return true
@@ -406,12 +415,13 @@ class WebViewHost(
             super.onPageFinished(view, url)
             if (BuildConfig.DEBUG) Log.d(SPIKE_TAG, "pageFinished url=$url")
             urlTracker.onPageFinished(url)
+            MapsLanguage.save(activity, url)
             view.evaluateJavascript("""
                 var head = document.getElementsByTagName('head');
                 if (head.length > 0) {
                     var style = document.createElement('style');
                     style.setAttribute('type', 'text/css');
-                    style.textContent = '.ml-persistent-promo-banner { display: none !important; } #app { top: 0 !important }';
+                    style.textContent = '.ml-persistent-promo-banner { display: none !important; } #app { top: 0 !important } #google-feedback, #google-feedback-submit-frame { display: none !important; }';
                     head[0].appendChild(style);
                 }
             """.trimIndent(), null)

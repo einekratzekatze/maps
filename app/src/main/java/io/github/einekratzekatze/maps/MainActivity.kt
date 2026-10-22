@@ -40,6 +40,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import io.github.einekratzekatze.maps.data.DebugSeeder
 import io.github.einekratzekatze.maps.map.MapCommands
 import io.github.einekratzekatze.maps.map.MapStateRepository
+import io.github.einekratzekatze.maps.map.MapsLanguage
 import io.github.einekratzekatze.maps.map.PageScript
 import io.github.einekratzekatze.maps.map.WebSessionViewModel
 import io.github.einekratzekatze.maps.map.WebViewHost
@@ -137,7 +138,7 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             Log.d(TAG, "No or Invalid URL passed (${urlToLoad}). Opening homepage instead.")
         }
-        return urlToLoad
+        return MapsLanguage.withLanguage(urlToLoad, MapsLanguage.saved(this))
     }
 
     private fun initShareLinkListener() {
