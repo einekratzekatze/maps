@@ -38,11 +38,11 @@ class PlacesRepository @Inject constructor(
     private val db: AppDatabase,
     @IoDispatcher private val io: CoroutineDispatcher,
     private val clock: Clock,
-) {
+) : PlacesQueries {
     private val places get() = db.placeDao()
     private val important get() = db.importantLocationDao()
 
-    fun observeInBounds(bounds: GeoBounds, center: LatLon, limit: Int): Flow<List<NearbyPlaceRow>> {
+    override fun observeInBounds(bounds: GeoBounds, center: LatLon, limit: Int): Flow<List<NearbyPlaceRow>> {
         require(limit > 0) { "limit must be positive" }
         return places.observeInBounds(
             bounds.south, bounds.west, bounds.north, bounds.east,
@@ -50,10 +50,10 @@ class PlacesRepository @Inject constructor(
         )
     }
 
-    fun observeHasAnyPlaces(): Flow<Boolean> = places.observeHasAnyPlaces()
-    fun observeDetail(id: Long): Flow<PlaceDetailRow?> = places.observeDetail(id)
-    fun observeImportant(): Flow<List<ImportantLocation>> = important.observeAll()
-    fun observeImportantInBounds(bounds: GeoBounds): Flow<List<ImportantLocation>> =
+    override fun observeHasAnyPlaces(): Flow<Boolean> = places.observeHasAnyPlaces()
+    override fun observeDetail(id: Long): Flow<PlaceDetailRow?> = places.observeDetail(id)
+    override fun observeImportant(): Flow<List<ImportantLocation>> = important.observeAll()
+    override fun observeImportantInBounds(bounds: GeoBounds): Flow<List<ImportantLocation>> =
         important.observeInBounds(bounds.south, bounds.west, bounds.north, bounds.east)
 
     /** A blank query returns no places (suggestions need input; recents cover the empty field). */

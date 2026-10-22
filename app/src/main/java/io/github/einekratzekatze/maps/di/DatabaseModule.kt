@@ -19,6 +19,10 @@ import io.github.einekratzekatze.maps.data.db.PlaceListDao
 import io.github.einekratzekatze.maps.data.db.RecentSearchDao
 import io.github.einekratzekatze.maps.data.repo.DataStoreDrivesListIdStore
 import io.github.einekratzekatze.maps.data.repo.DrivesListIdStore
+import io.github.einekratzekatze.maps.data.repo.PlacesQueries
+import io.github.einekratzekatze.maps.data.repo.PlacesRepository
+import io.github.einekratzekatze.maps.data.prefs.BubblePrefs
+import io.github.einekratzekatze.maps.data.prefs.DataStoreBubblePrefs
 import javax.inject.Singleton
 
 /** Repositories have @Inject constructors and need no bindings here. */
@@ -30,6 +34,8 @@ object DatabaseModule {
         AppDatabase.configure(Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.FILE_NAME)).build()
 
     @Provides @Singleton fun drivesListIdStore(impl: DataStoreDrivesListIdStore): DrivesListIdStore = impl
+    @Provides fun placesQueries(impl: PlacesRepository): PlacesQueries = impl
+    @Provides fun bubblePrefs(impl: DataStoreBubblePrefs): BubblePrefs = impl
 
     /** The single app-wide preferences DataStore (one file; features add keys, never a second delegate). */
     @Provides @Singleton
