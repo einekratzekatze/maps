@@ -153,8 +153,9 @@ private fun NearbyBody(content: NearbyContent, actions: PlacesBubbleActions, mod
             }
             if (content.truncated || content.totalInView > content.items.size) {
                 item(key = "footer") {
-                    val text = if (content.truncated) stringResource(R.string.nearby_footer_truncated, content.items.size)
-                    else stringResource(R.string.nearby_footer, content.items.size, content.totalInView)
+                    val shown = content.items.size
+                    val text = if (content.truncated) pluralStringResource(R.plurals.nearby_footer_truncated, shown, shown)
+                    else pluralStringResource(R.plurals.nearby_footer, shown, shown, content.totalInView)
                     Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(16.dp))
                 }
             }
