@@ -24,6 +24,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import io.github.einekratzekatze.maps.BuildConfig
 import io.github.einekratzekatze.maps.MainActivity
 import io.github.einekratzekatze.maps.map.MapCommands
 import io.github.einekratzekatze.maps.map.MapStateRepository
@@ -67,6 +68,7 @@ fun MapScreen(host: WebViewHost, mapState: MapStateRepository, commands: MapComm
     ) { inner ->
         Box(Modifier.fillMaxSize().padding(inner).consumeWindowInsets(inner)) {
             MapWebView(host, Modifier.fillMaxSize())
+            if (BuildConfig.DEBUG) DebugCameraOverlay(mapState)
             // MarkerOverlay and DriveSavePrompt go here (§7.2), below the bubble.
             PlacesBubbleOverlay(bubble, Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing))
             // TODO(custom search, nav-handoff): real actions for the search and drive-prompt branches.
